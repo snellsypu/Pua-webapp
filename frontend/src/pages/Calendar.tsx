@@ -12,11 +12,12 @@ import {
   startOfMonth,
   startOfWeek,
 } from "date-fns";
-import { ChevronLeft, ChevronRight, Plus, Sprout } from "lucide-react";
+import { ChevronLeft, ChevronRight, Lock, Plus, Sprout, Users } from "lucide-react";
 import { apiDelete, apiGet } from "@/lib/api";
 import type {
   Appointment,
   DayContext,
+  FriendCalendar,
   HabitStats,
   Meal,
   RangeBundle,
@@ -34,7 +35,18 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 
+// One colour per friend layer (dot, chip and bar tones).
+const FRIEND_TONES = [
+  { dot: "bg-amber-500", bar: "border-l-amber-500", chip: "bg-amber-500/15 text-amber-800 dark:text-amber-300" },
+  { dot: "bg-sky-500", bar: "border-l-sky-500", chip: "bg-sky-500/15 text-sky-800 dark:text-sky-300" },
+  { dot: "bg-rose-500", bar: "border-l-rose-500", chip: "bg-rose-500/15 text-rose-800 dark:text-rose-300" },
+  { dot: "bg-teal-500", bar: "border-l-teal-500", chip: "bg-teal-500/15 text-teal-800 dark:text-teal-300" },
+  { dot: "bg-fuchsia-500", bar: "border-l-fuchsia-500", chip: "bg-fuchsia-500/15 text-fuchsia-800 dark:text-fuchsia-300" },
+];
+const LAYER_KEY = "pua:friends-layer";
+
 export default function Calendar() {
+  const [showFriends, setShowFriends] = useState(() => localStorage.getItem(LAYER_KEY) !== "off");
   const [month, setMonth] = useState(() => new Date());
   const [selected, setSelected] = useState<string | null>(null);
   const [apptOpen, setApptOpen] = useState(false);
@@ -56,6 +68,24 @@ export default function Calendar() {
     queryFn: () => apiGet<RangeBundle>(`/range?from=${from}&to=${to}`),
   });
   const habits = useQuery({ queryKey: ["habits"], queryFn: () => apiGet<HabitStats[]>("/habits") });
+  const friends = useQuery({
+    queryKey: ["friends-calendar", from, to],
+    queryFn: () => apiGet<FriendCalendar[]>(`/sharing/calendar?from=${from}&to=${to}`),
+  });
+  const friendLayers = useMemo(
+    () => (friends.data ?? []).map((f, i) => ({ ...f, tone: FRIEND_TONES[i % FRIEND_TONES.length] })),
+    [friends.data],
+  );
+  const toggleFriends = () => {
+    setShowFriends((v) => {
+      localStorage.setItem(LAYER_KEY, v ? "off" : "on");
+      return !v;
+    });
+  };
+  const friendsOn = (iso: string) =>
+    showFriends
+      ? friendLayers.flatMap((f) => f.appointments.filter((a) => a.date === iso).map((a) => ({ a, f })))
+      : [];
 
   const days = useMemo(
     () => eachDayOfInterval({ start: gridStart, end: gridEnd }),
@@ -132,6 +162,9 @@ export default function Calendar() {
           const mealCount = (byDate.meals.get(iso) ?? []).length;
           const habitDone = byDate.comps.get(iso)?.size ?? 0;
           const habitTotal = habits.data?.length ?? 0;
+          const friendTones = showFriends
+            ? friendLayers.filter((f) => f.appointments.some((a) => a.date === iso))
+            : [];
           return (
             <button
               key={iso}
@@ -143,8 +176,17 @@ export default function Calendar() {
                 iso === today && "ring-2 ring-primary",
               )}
             >
-              <span className={cn("font-mono text-xs", iso === today && "font-bold text-primary")}>
-                {format(d, "d")}
+              <span className="flex items-center justify-between gap-1">
+                <span className={cn("font-mono text-xs", iso === today && "font-bold text-primary")}>
+                  {format(d, "d")}
+                </span>
+                {friendTones.length > 0 && (
+                  <span className="flex -space-x-0.5" data-testid={`calendar-friend-dots-${iso}`}>
+                    {friendTones.map((f) => (
+                      <span key={f.owner.user_id} className={cn("size-2 rounded-full ring-1 ring-card", f.tone.dot)} title={`${f.owner.name.split(" ")[0]} is busy`} />
+                    ))}
+                  </span>
+                )}
               </span>
               <div className="mt-auto flex items-center gap-1">
                 {appts.length > 0 && (
@@ -167,10 +209,26 @@ export default function Calendar() {
           );
         })}
       </div>
-      <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-        <Sprout className="size-3.5" /> Tap a day to see its plan — appointments, habits, meals and
-        reminders.
-      </p>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <Sprout className="size-3.5" /> Tap a day to see its plan — appointments, habits, meals and
+          reminders.
+        </p>
+        {friendLayers.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2" data-testid="calendar-friends-legend">
+            {showFriends && friendLayers.map((f) => (
+              <span key={f.owner.user_id} className={cn("inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium", f.tone.chip)}
+                data-testid={`calendar-friend-chip-${f.owner.user_id}`}>
+                <span className={cn("size-2 rounded-full", f.tone.dot)} /> {f.owner.name.split(" ")[0]}
+              </span>
+            ))}
+            <Button variant={showFriends ? "secondary" : "outline"} size="xs" onClick={toggleFriends} aria-pressed={showFriends}
+              data-testid="calendar-friends-toggle">
+              <Users className="size-3.5" /> {showFriends ? "Hide friends" : "Show friends"}
+            </Button>
+          </div>
+        )}
+      </div>
 
       <Sheet open={!!selected} onOpenChange={(o) => !o && setSelected(null)}>
         <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-md" data-testid="calendar-day-sheet">
@@ -206,6 +264,27 @@ export default function Calendar() {
                 onDelete={(a) => delAppt.mutate(a.id)}
               />
             </section>
+            {selected && friendsOn(selected).length > 0 && (
+              <section data-testid="calendar-sheet-friends">
+                <h3 className="mb-2 flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  <Users className="size-3.5" /> Friends
+                </h3>
+                <ul className="space-y-1.5">
+                  {friendsOn(selected).map(({ a, f }) => (
+                    <li key={`${f.owner.user_id}-${a.id}`} className={cn("flex items-center gap-3 rounded-lg border border-l-4 bg-card/60 px-3 py-2", f.tone.bar)}
+                      data-testid={`calendar-friend-appt-${a.id}`}>
+                      <span className="w-20 shrink-0 font-mono text-xs text-muted-foreground">{a.startTime}{a.endTime ? `–${a.endTime}` : ""}</span>
+                      <span className="min-w-0 flex-1">
+                        <span className={cn("flex items-center gap-1.5 truncate text-sm font-medium", a.private && "text-muted-foreground")}>
+                          {a.private && <Lock className="size-3 shrink-0" />}{a.title}
+                        </span>
+                        <span className="block text-xs text-muted-foreground">{f.owner.name.split(" ")[0]}</span>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
             <section>
               <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 Habits

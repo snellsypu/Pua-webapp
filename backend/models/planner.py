@@ -202,6 +202,7 @@ class Appointment(BaseModel):
     # Picked from address search — exact destination, no geocoding needed (None = free text)
     locationLat: float | None = Field(default=None, ge=-90, le=90)
     locationLon: float | None = Field(default=None, ge=-180, le=180)
+    private: bool = False  # friends see a blank "Unavailable" block instead
     createdAt: datetime = Field(default_factory=_now)
 
     @field_validator("date")
@@ -225,6 +226,7 @@ class AppointmentCreate(BaseModel):
     travelMode: str | None = None
     locationLat: float | None = Field(default=None, ge=-90, le=90)
     locationLon: float | None = Field(default=None, ge=-180, le=180)
+    private: bool = False
 
     @field_validator("travelMode")
     @classmethod
@@ -252,6 +254,7 @@ class AppointmentUpdate(BaseModel):
     travelMode: str | None = None  # explicit null = back to the default mode
     locationLat: float | None = Field(default=None, ge=-90, le=90)  # explicit null = free text
     locationLon: float | None = Field(default=None, ge=-180, le=180)
+    private: bool | None = None
 
     @field_validator("travelMode")
     @classmethod

@@ -69,5 +69,8 @@ async def onboard(input: OnboardIn, request: Request):
                 d = DEFAULTS[kind]
                 await db.routines.insert_one({"kind": kind, "title": d["title"], "time": d["time"],
                                               "notify": False, "steps": [], "lastNotifiedDate": None})
+        from lib.packs import apply_packs
+
+        await apply_packs(input.packs)
     await raw_db.users.update_one({"user_id": user["user_id"]}, {"$set": {"onboarded": True}})
     return AuthUser(**{**user, "onboarded": True})

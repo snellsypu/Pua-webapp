@@ -235,8 +235,8 @@ Emergent-managed Google sign-in (lib/auth.py, routers/auth.py, frontend lib/auth
   it per user; `raw_db` is unscoped (users, user_sessions, shares, caches). Unique indexes
   are per owner. Startup migration dropped old global indexes + ownerless legacy data.
 - **First sign-in**: `AuthUser.onboarded=false` → Onboarding page: Sample planner
-  (seed.run_all under the user's scope) or Clear planner (routines with no steps) →
-  POST `/api/auth/onboard {sample}`.
+  (seed.run_all under the user's scope), Starter packs, or Clear planner (routines with no
+  steps) → POST `/api/auth/onboard {sample, packs?}`.
 - **Friend codes / sharing (view-only)**: users have `friendCode` (8 chars, no 0/O/1/I,
   shown ABCD-2345) and `shareCategories` ⊆ appointments, reminders, habits, routines, meals,
   shopping (admin = planner owner; "Everything" = all). `shares` {ownerId, viewerId}.
@@ -246,6 +246,19 @@ Emergent-managed Google sign-in (lib/auth.py, routers/auth.py, frontend lib/auth
   GET /planner/{ownerId} → SharedPlanner snapshot (404 without a link) built by calling the
   normal list handlers under the owner's scope: appointments/reminders today+13 d, habits,
   routines today, meals this week, shopping — only shared categories (others null).
+- **Shared shopping edits**: user `shoppingEdit` (default true; PUT /sharing/shopping-edit
+  {enabled}) — when shopping is shared and enabled, viewers may POST
+  /sharing/planner/{ownerId}/shopping {name} and PATCH .../shopping/{itemId} {checked}
+  (tick only, no rename/delete); 403 when off, 404 without a link. Everything else view-only.
+- **Private appointments**: `Appointment.private` (create-dialog "Private" switch, lock icon in
+  agendas). Friends get them masked as "Unavailable" (time kept; location/notes/coords dropped)
+  in the snapshot and the calendar overlay.
+- **Combined calendar**: GET /sharing/calendar?from&to → [{owner, appointments}] for joined
+  planners that share appointments. Calendar shows a coloured dot per friend per day, a legend
+  with a Show/Hide friends toggle (localStorage `pua:friends-layer`) and a "Friends" section in
+  the day sheet.
+- **Starter packs** (lib/packs.py): onboarding 3rd option — clear planner + picked packs
+  (`OnboardIn.packs` ⊆ fitness, mindful, home habit packs; morning, bedtime routine steps).
 - Frontend: AuthGate (splash → SignIn → Onboarding → app; any 401 re-checks /auth/me);
   /sharing page (code + copy/new, category checkboxes, members, join, joined planners) and
   /shared/:ownerId read-only page ("View only" badge); header AccountButton (Sharing &

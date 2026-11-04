@@ -39,6 +39,11 @@ export default function Sharing() {
     onSuccess: set,
     onError: (e) => toast.error(errText(e)),
   });
+  const shopEdit = useMutation({
+    mutationFn: (enabled: boolean) => apiPut<SharingState>("/sharing/shopping-edit", { enabled }),
+    onSuccess: (st, enabled) => { set(st); toast.success(enabled ? "Friends can now tick off and add shopping items" : "Shopping list is view-only for friends"); },
+    onError: (e) => toast.error(errText(e)),
+  });
   const regen = useMutation(m(() => apiPost<SharingState>("/sharing/code/regenerate"), "New friend code — the old one no longer works"));
   const join = useMutation({
     mutationFn: (c: string) => apiPost<SharingState>("/sharing/join", { code: c }),
@@ -71,7 +76,7 @@ export default function Sharing() {
     <div className="mx-auto max-w-3xl space-y-6" data-testid="sharing-page">
       <header>
         <h1 className="font-heading text-3xl font-bold tracking-tight">Sharing &amp; friends</h1>
-        <p className="mt-1 text-muted-foreground">Give your friend code to people you trust. They can <b>view</b> the parts you choose — never change them.</p>
+        <p className="mt-1 text-muted-foreground">Give your friend code to people you trust. They can <b>view</b> the parts you choose — the shopping list is the only thing you can let them edit.</p>
       </header>
 
       <div className="grid gap-6 md:grid-cols-5">
@@ -111,6 +116,15 @@ export default function Sharing() {
                 </label>
               ))}
             </div>
+            {s && selected.has("shopping") && (
+              <label htmlFor="share-shopping-edit" className="flex items-start gap-2.5 rounded-xl border border-dashed px-3 py-2 text-sm">
+                <Checkbox id="share-shopping-edit" className="mt-0.5" checked={s.shoppingEdit} disabled={shopEdit.isPending}
+                  onCheckedChange={(v) => shopEdit.mutate(v === true)} data-testid="share-shopping-edit" />
+                <span><span className="block font-medium">Friends can tick off &amp; add shopping items</span>
+                  <span className="block text-xs text-muted-foreground">Everything else stays view-only.</span></span>
+              </label>
+            )}
+            <p className="text-xs text-muted-foreground" data-testid="share-private-hint">Appointments marked Private show to friends as &ldquo;Unavailable&rdquo;.</p>
             {s && selected.size === 0 && <p className="text-xs text-muted-foreground" data-testid="share-nothing">Nothing shared — friends who join see an empty page.</p>}
           </CardContent>
         </Card>
@@ -157,6 +171,7 @@ export default function Sharing() {
                     <span className="block truncate text-sm font-medium">{p.name}</span>
                     <span className="block truncate text-xs text-muted-foreground">
                       {p.categories.length ? p.categories.map((c) => SHARE_LABELS[c]).join(" · ") : "Nothing shared yet"}
+                      {p.shoppingEdit && " · you can edit shopping"}
                     </span>
                   </span>
                   <Link to={`/shared/${p.user_id}`} className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-primary px-3 text-sm font-medium text-primary-foreground transition-opacity duration-150 hover:opacity-90"

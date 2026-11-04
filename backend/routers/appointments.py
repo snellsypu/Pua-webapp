@@ -35,6 +35,8 @@ async def create_appointment(input: AppointmentCreate):
 @router.put("/{id}", response_model=Appointment)
 async def update_appointment(id: str, input: AppointmentUpdate):
     updates = input.model_dump(exclude_unset=True)
+    if updates.get("private", False) is None:
+        updates.pop("private")
     if not updates:
         raise HTTPException(status_code=422, detail="Nothing to update")
     doc = await db.appointments.find_one_and_update(

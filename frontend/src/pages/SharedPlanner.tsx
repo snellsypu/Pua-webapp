@@ -1,9 +1,14 @@
 // View-only snapshot of a friend's planner — only the parts they chose to share.
+import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Check, Eye, MapPin } from "lucide-react";
-import { apiGet, ApiError } from "@/lib/api";
-import type { SharedPlanner } from "@/lib/types";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+import { ArrowLeft, Check, Eye, Lock, MapPin, Pencil, Plus } from "lucide-react";
+import { apiGet, apiPatch, apiPost, ApiError } from "@/lib/api";
+import type { SharedPlanner, ShoppingItem } from "@/lib/types";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
 import { fmtShort } from "@/lib/dates";
 import { Avatar } from "@/components/AccountButton";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -22,6 +27,20 @@ export default function SharedPlannerPage() {
   const { ownerId = "" } = useParams();
   const q = useQuery({ queryKey: ["shared", ownerId], queryFn: () => apiGet<SharedPlanner>(`/sharing/planner/${ownerId}`), retry: false });
   const p = q.data;
+  const qc = useQueryClient();
+  const [item, setItem] = useState("");
+  const refresh = () => qc.invalidateQueries({ queryKey: ["shared", ownerId] });
+  const fail = (e: unknown) => toast.error(e instanceof ApiError && e.status === 403 ? "This shopping list is view-only now" : "Couldn't update the list");
+  const add = useMutation({
+    mutationFn: (name: string) => apiPost<ShoppingItem>(`/sharing/planner/${ownerId}/shopping`, { name }),
+    onSuccess: (i) => { setItem(""); refresh(); toast.success(`Added ${i.name}`); },
+    onError: (e) => { refresh(); fail(e); },
+  });
+  const tick = useMutation({
+    mutationFn: (v: { id: string; checked: boolean }) => apiPatch<ShoppingItem>(`/sharing/planner/${ownerId}/shopping/${v.id}`, { checked: v.checked }),
+    onSuccess: refresh,
+    onError: (e) => { refresh(); fail(e); },
+  });
 
   if (q.error) {
     return (
@@ -45,7 +64,7 @@ export default function SharedPlannerPage() {
           <p className="text-sm text-muted-foreground">{p?.owner.email}</p>
         </div>
         <span className="inline-flex items-center gap-1.5 rounded-full border bg-muted/40 px-3 py-1 text-xs font-medium" data-testid="shared-view-only">
-          <Eye className="size-3.5" /> View only
+          <Eye className="size-3.5" /> {p?.shoppingEdit ? "View only · shopping editable" : "View only"}
         </span>
       </header>
 
@@ -58,9 +77,10 @@ export default function SharedPlannerPage() {
           <Section title="Appointments · next 2 weeks" id="appointments" empty={!p.appointments.length}>
             <ul className="space-y-2">
               {p.appointments.map((a) => (
-                <li key={a.id} className="flex gap-3 rounded-xl border px-3 py-2">
+                <li key={a.id} className={cn("flex gap-3 rounded-xl border px-3 py-2", a.private && "border-dashed bg-muted/40")} data-testid={`shared-appointment-${a.id}`}>
                   <span className="w-24 shrink-0 font-mono text-xs text-muted-foreground">{a.date === p.today ? "Today" : fmtShort(a.date)}<br />{a.startTime}{a.endTime ? `–${a.endTime}` : ""}</span>
-                  <span className="min-w-0"><span className="block font-medium">{a.title}</span>
+                  <span className="min-w-0"><span className={cn("flex items-center gap-1.5 font-medium", a.private && "text-muted-foreground")}>
+                    {a.private && <Lock className="size-3.5" />}{a.title}</span>
                     {a.location && <span className="flex items-center gap-1 text-xs text-muted-foreground"><MapPin className="size-3" /> {a.location}</span>}</span>
                 </li>
               ))}
@@ -114,11 +134,37 @@ export default function SharedPlannerPage() {
           </Section>
         )}
         {p?.shopping && (
-          <Section title="Shopping list" id="shopping" empty={!p.shopping.length}>
-            <ul className="space-y-1 text-sm">
-              {p.shopping.map((i) => <li key={i.id} className={cn(i.checked && "text-muted-foreground line-through")}>· {i.name}</li>)}
-            </ul>
-          </Section>
+          <Card data-testid="shared-shopping">
+            <CardHeader className="flex flex-row items-center justify-between gap-2">
+              <CardTitle className="font-heading text-lg">Shopping list</CardTitle>
+              {p.shoppingEdit && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-primary/15 px-2.5 py-0.5 text-xs font-medium text-primary" data-testid="shared-shopping-editable">
+                  <Pencil className="size-3" /> You can tick &amp; add
+                </span>
+              )}
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {p.shoppingEdit && (
+                <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); if (item.trim()) add.mutate(item.trim()); }}>
+                  <Input value={item} onChange={(e) => setItem(e.target.value)} placeholder="Add an item…" data-testid="shared-shopping-input" />
+                  <Button type="submit" size="sm" className="h-9" disabled={!item.trim() || add.isPending} data-testid="shared-shopping-add"><Plus className="size-4" /> Add</Button>
+                </form>
+              )}
+              {!p.shopping.length ? <p className="text-sm text-muted-foreground">Nothing here.</p> : (
+                <ul className="space-y-1.5 text-sm">
+                  {p.shopping.map((i) => (
+                    <li key={i.id} className="flex items-center gap-2.5" data-testid={`shared-shopping-item-${i.id}`}>
+                      {p.shoppingEdit ? (
+                        <Checkbox checked={i.checked} disabled={tick.isPending} aria-label={`Tick ${i.name}`}
+                          onCheckedChange={(v) => tick.mutate({ id: i.id, checked: v === true })} data-testid={`shared-shopping-check-${i.id}`} />
+                      ) : <span className="text-muted-foreground">·</span>}
+                      <span className={cn("transition-colors duration-150", i.checked && "text-muted-foreground line-through")}>{i.name}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </CardContent>
+          </Card>
         )}
       </div>
     </div>

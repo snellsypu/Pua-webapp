@@ -1,4 +1,4 @@
-import { MapPin, Pencil, Trash2 } from "lucide-react";
+import { Lock, MapPin, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { Appointment } from "@/lib/types";
 
@@ -33,7 +33,10 @@ export function DayAgenda({
             {a.endTime ? `–${a.endTime}` : ""}
           </div>
           <div className="min-w-0 flex-1">
-            <div className="truncate text-sm font-medium">{a.title}</div>
+            <div className="flex items-center gap-1.5 truncate text-sm font-medium">
+              {a.private && <Lock className="size-3 shrink-0 text-muted-foreground" aria-label="Private" data-testid={`appointment-private-${a.id}`} />}
+              <span className="truncate">{a.title}</span>
+            </div>
             {a.location && (
               <div className="flex items-center gap-1 text-xs text-muted-foreground">
                 <MapPin className="size-3 shrink-0" />

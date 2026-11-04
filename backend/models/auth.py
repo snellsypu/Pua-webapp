@@ -19,8 +19,12 @@ class AuthUser(BaseModel):
     onboarded: bool = False
 
 
+PackId = Literal["fitness", "mindful", "home", "morning", "bedtime"]
+
+
 class OnboardIn(BaseModel):
-    sample: bool  # True = sample planner, False = clear planner
+    sample: bool  # True = sample planner, False = clear planner (+ optional starter packs)
+    packs: list[PackId] = Field(default_factory=list, max_length=5)
 
 
 class Person(BaseModel):
@@ -32,11 +36,13 @@ class Person(BaseModel):
 
 class JoinedPlanner(Person):
     categories: list[ShareCategory]
+    shoppingEdit: bool = False  # friends may tick off / add shopping items
 
 
 class SharingState(BaseModel):
     friendCode: str
     categories: list[ShareCategory]  # what this user shares
+    shoppingEdit: bool = True  # friends may tick off / add items on the shared shopping list
     members: list[Person]  # people who joined with this user's code
     joined: list[JoinedPlanner]  # planners this user can view
 
@@ -47,3 +53,7 @@ class CategoriesIn(BaseModel):
 
 class JoinIn(BaseModel):
     code: str = Field(min_length=4, max_length=16)
+
+
+class ShoppingEditIn(BaseModel):
+    enabled: bool

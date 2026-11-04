@@ -108,6 +108,7 @@ export interface Appointment {
   travelMode: TravelMode | null; // Premium per-appointment mode; null = default
   locationLat: number | null; // set when picked from address search
   locationLon: number | null;
+  private: boolean; // friends see a blank "Unavailable" block
 }
 
 export interface AppointmentCreate {
@@ -120,6 +121,7 @@ export interface AppointmentCreate {
   travelMode?: TravelMode | null;
   locationLat?: number | null;
   locationLon?: number | null;
+  private?: boolean;
 }
 
 export type HabitMode = "streak" | "monthly";
@@ -385,11 +387,13 @@ export interface Person {
 
 export interface JoinedPlanner extends Person {
   categories: ShareCategory[];
+  shoppingEdit: boolean; // you may tick off / add items on their list
 }
 
 export interface SharingState {
   friendCode: string;
   categories: ShareCategory[];
+  shoppingEdit: boolean; // friends may tick off / add shopping items
   members: Person[];
   joined: JoinedPlanner[];
 }
@@ -399,10 +403,24 @@ export interface SharedPlanner {
   owner: Person;
   categories: ShareCategory[];
   today: string;
-  appointments: Appointment[] | null;
+  shoppingEdit: boolean;
+  appointments: Appointment[] | null; // private ones arrive as "Unavailable"
   reminders: Reminder[] | null;
   habits: HabitStats[] | null;
   routines: RoutineState[] | null;
   meals: Meal[] | null;
   shopping: ShoppingItem[] | null;
+}
+
+// Mirrors FriendCalendar in backend/models/sharing.py — calendar overlay
+export interface FriendCalendar {
+  owner: Person;
+  appointments: Appointment[];
+}
+
+// Mirrors OnboardIn in backend/models/auth.py
+export type StarterPack = "fitness" | "mindful" | "home" | "morning" | "bedtime";
+export interface OnboardIn {
+  sample: boolean;
+  packs?: StarterPack[];
 }

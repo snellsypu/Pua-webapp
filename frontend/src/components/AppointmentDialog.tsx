@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Check, Loader2, MapPin, Search, Trash2 } from "lucide-react";
+import { Check, Loader2, Lock, MapPin, Search, Trash2 } from "lucide-react";
 import { apiDelete, apiGet, apiPost, apiPut, ApiError } from "@/lib/api";
 import type { AppSettings, Appointment, GeoPlace, TravelMode } from "@/lib/types";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -39,6 +39,7 @@ export interface AppointmentDraft {
   travelMode?: TravelMode | null;
   locationLat?: number | null;
   locationLon?: number | null;
+  private?: boolean;
 }
 
 export function AppointmentDialog({
@@ -55,6 +56,7 @@ export function AppointmentDialog({
   const settings = useQuery({ queryKey: ["settings"], queryFn: () => apiGet<AppSettings>("/settings") });
   const premium = settings.data?.premiumVoice ?? false;
   const [travel, setTravel] = useState<TravelMode | "default">("default");
+  const [isPrivate, setIsPrivate] = useState(false);
   const [coords, setCoords] = useState<{ lat: number; lon: number } | null>(null);
   const [places, setPlaces] = useState<GeoPlace[] | null>(null);
   const find = useMutation({
@@ -82,6 +84,7 @@ export function AppointmentDialog({
         notes: initial?.notes ?? "",
       });
       setTravel(initial?.travelMode ?? "default");
+      setIsPrivate(initial?.private ?? false);
       setCoords(initial?.locationLat != null && initial?.locationLon != null ? { lat: initial.locationLat, lon: initial.locationLon } : null);
       setPlaces(null);
     }
@@ -105,6 +108,7 @@ export function AppointmentDialog({
         notes: form.notes.trim(),
         locationLat: form.location.trim() && coords ? coords.lat : null,
         locationLon: form.location.trim() && coords ? coords.lon : null,
+        private: isPrivate,
         // Premium only; without Premium the field is left untouched.
         ...(premium ? { travelMode: travel === "default" ? null : travel } : {}),
       };
@@ -268,6 +272,27 @@ export function AppointmentDialog({
               </Select>
             </div>
           )}
+          <button
+            type="button"
+            role="switch"
+            aria-checked={isPrivate}
+            onClick={() => setIsPrivate((v) => !v)}
+            data-testid="appointment-private-toggle"
+            className={`flex items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition-[background-color,border-color] duration-150 ${isPrivate ? "border-primary/60 bg-primary/10" : "hover:bg-accent"}`}
+          >
+            <span className={`grid size-8 shrink-0 place-items-center rounded-lg ${isPrivate ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
+              <Lock className="size-4" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm font-medium">Private</span>
+              <span className="block text-xs text-muted-foreground" data-testid="appointment-private-hint">
+                {isPrivate ? "Friends only see this time as \u201cUnavailable\u201d" : "Friends you share with can see the details"}
+              </span>
+            </span>
+            <span className={`relative h-5 w-9 shrink-0 rounded-full transition-colors duration-150 ${isPrivate ? "bg-primary" : "bg-muted-foreground/30"}`}>
+              <span className={`absolute top-0.5 size-4 rounded-full bg-background shadow transition-transform duration-150 ${isPrivate ? "translate-x-4" : "translate-x-0.5"}`} />
+            </span>
+          </button>
           <div className="grid gap-1.5">
             <Label htmlFor="appt-notes">Notes</Label>
             <Textarea
