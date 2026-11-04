@@ -55,7 +55,7 @@ async def unsubscribe(endpoint: str = Query(min_length=10)):
 @router.post("/push/test", response_model=PushSendResult)
 async def send_test():
     return await push_lib.send_to_all(
-        "Daily Loop notifications are on 🔔",
+        "PUA notifications are on 🔔",
         "Your morning and bedtime routine reminders will arrive here.",
         url="/",
         tag="daily-loop-test",

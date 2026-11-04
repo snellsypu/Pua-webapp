@@ -17,6 +17,7 @@ export interface AppSettings {
   units: "celsius" | "fahrenheit";
   distanceUnit: DistanceUnit;
   timezone: string;
+  premiumVoice: boolean;
 }
 
 // Partial PUT — only the fields sent change. home: null clears the home city.
@@ -25,6 +26,7 @@ export interface SettingsUpdate {
   units?: "celsius" | "fahrenheit";
   distanceUnit?: DistanceUnit;
   timezone?: string;
+  premiumVoice?: boolean;
 }
 
 export interface Appointment {
@@ -245,4 +247,37 @@ export interface PushSendResult {
   sent: number;
   removed: number;
   failed: number;
+}
+
+// Mirrors backend/models/voice.py
+export type VoiceKind = "appointment" | "habit" | "reminder";
+
+export interface VoiceDraft {
+  kind: VoiceKind;
+  title: string;
+  date: string | null;
+  startTime: string | null;
+  endTime: string | null;
+  location: string;
+  time: string | null;
+  emoji: string;
+  habitMode: HabitMode;
+  monthlyTarget: number;
+  tracksDistance: boolean;
+}
+
+export interface VoiceParseIn {
+  text: string;
+  mode: "simple" | "ai";
+}
+
+export interface VoiceParseOut {
+  transcript: string;
+  mode: "simple" | "ai";
+  draft: VoiceDraft | null;
+  message: string | null;
+}
+
+export interface VoiceTranscript {
+  text: string;
 }

@@ -73,7 +73,7 @@ export function NotificationsCard() {
           <BellRing className="size-4" /> Routine notifications
         </CardTitle>
         <CardDescription>
-          Get a push notification at your morning and bedtime routine times, even when Daily Loop
+          Get a push notification at your morning and bedtime routine times, even when PUA
           is closed. They can arrive up to 15 minutes after the set time, and are skipped if the
           routine is already done.
         </CardDescription>
@@ -86,7 +86,7 @@ export function NotificationsCard() {
         )}
         {support === "needs-install" && (
           <p className="flex items-start gap-2 text-sm text-muted-foreground" data-testid="push-needs-install">
-            <Smartphone className="mt-0.5 size-4 shrink-0" /> On iPhone/iPad, first add Daily Loop
+            <Smartphone className="mt-0.5 size-4 shrink-0" /> On iPhone/iPad, first add PUA
             to your Home Screen (Share → Add to Home Screen), open it from there, then turn
             notifications on.
           </p>

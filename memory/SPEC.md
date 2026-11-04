@@ -1,4 +1,6 @@
-# Daily Loop — App Spec
+# PUA (Personal Uplink Assistant) — App Spec
+
+App name: **PUA — Personal Uplink Assistant** (renamed from Daily Loop; title, logo, manifest, push titles).
 
 A calendar app that tracks **habits** and **appointments** alongside **reminders**, with
 **morning overviews** (weather + today's plan) and **evening reviews** (today's recap +
@@ -89,6 +91,26 @@ tomorrow's preview). Public URL: https://daily-loop-8--68ipsq2d.preview.emergent
   subscriptions are deleted. Env: VAPID_PRIVATE_KEY, VAPID_PUBLIC_KEY, VAPID_SUBJECT,
   WEBHOOK_CRON_SECRET (app-generated, in backend/.env). iOS needs the installed home-screen app.
 - Settings PUT is now **partial** (only sent fields change; explicit home:null clears).
+
+- **Voice** (`components/VoiceAssistant.tsx`, mic button left of the + FAB, on every page).
+  Flow: listen → `POST /api/voice/parse` {text, mode} → editable preview (nothing saved yet) →
+  say "yes" (save/ok/confirm…) or "go back" (no/cancel… → listens again), or use the buttons.
+  Saving goes through the normal POST /appointments | /reminders | /habits endpoints.
+  - Free mode: browser SpeechRecognition (Chrome/Edge/Safari/Samsung Internet) + rule parser
+    `lib/voice_simple.py` (patterns: "appointment|meeting|event …", "remind me to …",
+    "[monthly] habit … [N times a month] [track distance]"; dates today/tonight/tomorrow/day
+    after tomorrow/[next] weekday/in N days/month D; times 3pm, 3:30 p.m., 15:00, at 3 (1–6 →
+    pm), morning 09:00/afternoon 14:00/evening 18:00/tonight 20:00).
+  - **Premium voice** = `settings.premiumVoice` (Settings → Voice; enforced server-side, 403
+    when off): silence-stopping MediaRecorder clip → `POST /api/voice/transcribe` (Whisper
+    `whisper-1`, ≤10 MB, webm/mp4/mp3/wav/m4a, 415 otherwise) and parse mode "ai" → Claude
+    Sonnet 5.5 (`anthropic`/`claude-sonnet-5-5`, fresh session per command, JSON-only, validated
+    by `VoiceDraft`; falls back to the rule parser on failure). EMERGENT_LLM_KEY in backend/.env.
+  - **"Hey PUA" wake word**: per-device toggle (localStorage `pua:wake`), continuous browser
+    recognition only while the voice dialog is closed and the app is open; fuzzy-matches
+    pua/poo-ah/puma etc.; "Hey PUA, <command>" parses the rest directly. Green dot on the mic
+    when active. Confirmation "yes"/"go back" always uses browser recognition (buttons fallback).
+- No payments: "premium" is a switch billed to the Emergent AI key, not a paid plan.
 
 ## Health data model
 - `health_events`: eventId (unique), type (nutrition|exercise|sleep), date, start, end,

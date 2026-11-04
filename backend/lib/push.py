@@ -37,7 +37,7 @@ def _send_sync(sub: dict, payload: str) -> int | None:
         return 0
 
 
-async def send_to_all(title: str, body: str, url: str = "/", tag: str = "daily-loop") -> PushSendResult:
+async def send_to_all(title: str, body: str, url: str = "/", tag: str = "pua") -> PushSendResult:
     payload = json.dumps({"title": title, "body": body, "url": url, "tag": tag})
     sent = removed = failed = 0
     subs = await db.push_subscriptions.find().to_list(500)

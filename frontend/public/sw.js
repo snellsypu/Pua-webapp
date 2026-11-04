@@ -1,4 +1,4 @@
-// Daily Loop service worker — shows Web Push notifications (routine reminders)
+// PUA (Personal Uplink Assistant) service worker — shows Web Push notifications (routine reminders)
 // and focuses/opens the app when one is tapped. Served at /sw.js (Vite public/).
 self.addEventListener("install", () => self.skipWaiting());
 self.addEventListener("activate", (event) => event.waitUntil(self.clients.claim()));
@@ -10,13 +10,13 @@ self.addEventListener("push", (event) => {
   } catch (_) {
     data = { body: event.data ? event.data.text() : "" };
   }
-  const title = data.title || "Daily Loop";
+  const title = data.title || "PUA";
   event.waitUntil(
     self.registration.showNotification(title, {
       body: data.body || "",
       icon: "/apple-touch-icon.png",
       badge: "/favicon-32x32.png",
-      tag: data.tag || "daily-loop",
+      tag: data.tag || "pua",
       renotify: true,
       data: { url: data.url || "/" },
     }),

@@ -15,6 +15,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { CreateFab } from "@/components/CreateFab";
+import { VoiceAssistant } from "@/components/VoiceAssistant";
 
 const NAV = [
   { to: "/", label: "Today", icon: SunMedium, testid: "nav-today" },
@@ -38,7 +39,12 @@ export default function AppShell() {
               <span className="grid size-8 place-items-center rounded-xl bg-primary text-primary-foreground">
                 <Sunrise className="size-4" />
               </span>
-              <span className="hidden sm:inline">Daily Loop</span>
+              <span className="hidden leading-tight sm:inline">
+                PUA
+                <span className="block text-[10px] font-medium tracking-normal text-muted-foreground">
+                  Personal Uplink Assistant
+                </span>
+              </span>
             </Link>
             <nav className="flex items-center gap-1">
               {NAV.map(({ to, label, icon: Icon, testid }) => (
@@ -102,6 +108,7 @@ export default function AppShell() {
         </main>
       </div>
       <CreateFab />
+      <VoiceAssistant />
       {/* Lifted above the FAB so toasts never cover the create button */}
       <Toaster richColors offset={{ bottom: 96, right: 24 }} mobileOffset={{ bottom: 92 }} />
     </MotionConfig>

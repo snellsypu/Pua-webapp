@@ -32,6 +32,7 @@ def _out(doc: dict) -> AppSettings:
         units=doc.get("units", "celsius"),
         distanceUnit=doc.get("distanceUnit", "km"),
         timezone=doc.get("timezone", "UTC"),
+        premiumVoice=bool(doc.get("premiumVoice", False)),
     )
 
 

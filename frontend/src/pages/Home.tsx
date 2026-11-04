@@ -57,7 +57,7 @@ export default function Home() {
   });
   const weather = useWeather();
   const qc = useQueryClient();
-  const [widget, setWidget] = useState(() => localStorage.getItem("dailyloop:widget") === "1");
+  const [widget, setWidget] = useState(() => localStorage.getItem("pua:widget") === "1");
   const [apptOpen, setApptOpen] = useState(false);
   const [apptDraft, setApptDraft] = useState<AppointmentDraft | undefined>();
 
@@ -94,7 +94,7 @@ export default function Home() {
   const toggleWidget = () => {
     const next = !widget;
     setWidget(next);
-    localStorage.setItem("dailyloop:widget", next ? "1" : "0");
+    localStorage.setItem("pua:widget", next ? "1" : "0");
   };
 
   const greeting =

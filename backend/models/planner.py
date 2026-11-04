@@ -55,6 +55,7 @@ class AppSettings(BaseModel):
     units: str = "celsius"
     distanceUnit: str = "km"
     timezone: str = "UTC"  # IANA zone from the browser; drives routine notification times
+    premiumVoice: bool = False  # AI transcription + natural-language voice (Emergent LLM key)
 
 
 class SettingsUpdate(BaseModel):
@@ -64,6 +65,7 @@ class SettingsUpdate(BaseModel):
     units: str | None = None
     distanceUnit: str | None = None
     timezone: str | None = None
+    premiumVoice: bool | None = None
 
     @field_validator("units")
     @classmethod

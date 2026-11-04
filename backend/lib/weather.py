@@ -17,7 +17,7 @@ GEOCODE_URL = "https://geocoding-api.open-meteo.com/v1/search"
 REVERSE_URL = "https://nominatim.openstreetmap.org/reverse"
 
 # Nominatim's policy requires an identifying User-Agent.
-NOMINATIM_UA = "daily-loop/1.0 (personal day-planner app)"
+NOMINATIM_UA = "pua-personal-uplink-assistant/1.0 (personal day-planner app)"
 
 _http: httpx.AsyncClient | None = None
 _cache: dict[str, tuple[float, Any]] = {}

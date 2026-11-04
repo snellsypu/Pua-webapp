@@ -1,6 +1,6 @@
 {
-  "name": "Daily Loop",
-  "short_name": "Daily Loop",
+  "name": "PUA — Personal Uplink Assistant",
+  "short_name": "PUA",
   "description": "Calendar with habits, appointments, reminders, morning briefings and evening reviews.",
   "start_url": "/",
   "display": "standalone",

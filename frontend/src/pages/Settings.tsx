@@ -7,6 +7,7 @@ import { Check, LocateFixed, MapPin, Search } from "lucide-react";
 import { apiGet, apiPut } from "@/lib/api";
 import type { AppSettings, GeoPlace, ReversePlace, SettingsUpdate } from "@/lib/types";
 import { NotificationsCard } from "@/components/NotificationsCard";
+import { VoiceSettingsCard } from "@/components/VoiceSettingsCard";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -244,13 +245,15 @@ export default function Settings() {
         </CardContent>
       </Card>
 
+      <VoiceSettingsCard />
+
       <NotificationsCard />
 
       <Card className={cn("border-dashed")}>
         <CardHeader>
           <CardTitle className="font-heading">Home screen widget</CardTitle>
           <CardDescription>
-            Add Daily Loop to your phone&apos;s home screen (browser menu → &ldquo;Add to Home
+            Add PUA to your phone&apos;s home screen (browser menu → &ldquo;Add to Home
             Screen&rdquo;) and open the widget view on the Today page for a one-glance summary of
             your day.
           </CardDescription>
