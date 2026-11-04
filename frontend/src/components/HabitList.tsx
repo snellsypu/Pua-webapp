@@ -7,6 +7,7 @@ import { apiGet, apiPost } from "@/lib/api";
 import type { AppSettings, HabitLog, HabitStats, HabitToggleOut } from "@/lib/types";
 import { fmtDist } from "@/lib/units";
 import { DistanceDialog } from "@/components/DistanceDialog";
+import { RunWeather } from "@/components/RunWeather";
 import { cn } from "@/lib/utils";
 
 export function useToggleHabit(date?: string) {
@@ -126,6 +127,7 @@ export function HabitList({
                   📏 {fmtDist(h.weekKm, unit)} this week · {fmtDist(h.monthKm, unit)} this month
                 </div>
               )}
+              {h.tracksDistance && !h.doneToday && <RunWeather habitId={h.id} unit={unit} />}
               {pct !== null && (
                 <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-muted">
                   <div

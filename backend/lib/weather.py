@@ -65,8 +65,8 @@ async def get_bundle(lat: float, lon: float, units: str = "celsius") -> WeatherB
         {
             "latitude": lat,
             "longitude": lon,
-            "current": "temperature_2m,apparent_temperature,is_day,weather_code",
-            "hourly": "temperature_2m,precipitation_probability,weather_code",
+            "current": "temperature_2m,apparent_temperature,is_day,weather_code,wind_speed_10m,wind_gusts_10m",
+            "hourly": "temperature_2m,precipitation_probability,weather_code,wind_speed_10m",
             "daily": "temperature_2m_max,temperature_2m_min,precipitation_probability_max,weather_code",
             "forecast_days": 3,
             "timezone": "auto",
@@ -93,12 +93,14 @@ async def get_bundle(lat: float, lon: float, units: str = "celsius") -> WeatherB
             temperature=float(temp or 0),
             precipProb=float(prec or 0),
             code=int(code or 0),
+            windSpeed=float(wind or 0),
         )
-        for t, temp, prec, code in zip(
+        for t, temp, prec, code, wind in zip(
             times[window],
             hourly.get("temperature_2m", [])[window],
             hourly.get("precipitation_probability", [])[window],
             hourly.get("weather_code", [])[window],
+            hourly.get("wind_speed_10m", [])[window] or [0] * 8,
         )
     ]
 
@@ -129,6 +131,8 @@ async def get_bundle(lat: float, lon: float, units: str = "celsius") -> WeatherB
             apparent=float(cur.get("apparent_temperature") or 0),
             code=int(cur.get("weather_code") or 0),
             isDay=bool(cur.get("is_day", 1)),
+            windSpeed=float(cur.get("wind_speed_10m") or 0),
+            windGusts=float(cur.get("wind_gusts_10m") or 0),
         ),
         hourly=hours,
         days=days,

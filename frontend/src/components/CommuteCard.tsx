@@ -6,7 +6,8 @@ import { toast } from "sonner";
 import { Car, Loader2, MapPin, Search, Sparkles, X } from "lucide-react";
 import { apiGet, apiPut, ApiError } from "@/lib/api";
 import type { AppSettings, GeoPlace, SettingsUpdate, TravelMode } from "@/lib/types";
-import { TRAVEL_LABELS } from "@/components/AppointmentDialog";
+import { TRAVEL_LABELS, travelModes } from "@/components/AppointmentDialog";
+import { PinLocations } from "@/components/PinLocations";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -118,13 +119,16 @@ export function CommuteCard() {
               <SelectValue>{TRAVEL_LABELS[s?.travelMode ?? "car"]}</SelectValue>
             </SelectTrigger>
             <SelectContent>
-              {(Object.keys(TRAVEL_LABELS) as TravelMode[]).map((m) => (
+              {travelModes(!!s?.transitAvailable).map((m) => (
                 <SelectItem key={m} value={m} data-testid={`settings-travel-mode-${m}`}>{TRAVEL_LABELS[m]}</SelectItem>
               ))}
             </SelectContent>
           </Select>
           <p className="text-xs text-muted-foreground">
-            Typical journey times without live traffic. Public transport isn&apos;t available yet.
+            Typical journey times without live traffic.
+            {s?.transitAvailable
+              ? " Public transport times come from your Google Maps account."
+              : " Public transport needs a Google Maps key (not connected yet)."}
             Walking or cycling into heavy rain? PUA suggests driving instead.
             {premium ? " You can also pick a mode per appointment." : " Premium lets you pick a mode per appointment."}
           </p>
@@ -157,6 +161,7 @@ export function CommuteCard() {
             </span>
           </span>
         </label>
+        <PinLocations />
         <p className="text-[11px] text-muted-foreground">
           Maps &amp; routes © <a className="underline" href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap</a> contributors
         </p>

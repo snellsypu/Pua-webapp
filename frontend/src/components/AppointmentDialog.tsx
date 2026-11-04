@@ -9,7 +9,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 /** "Reading, Station Hill, Reading, England, RG1 1LZ, UK" → "Reading, Station Hill, Reading" */
 const shortName = (display: string) => display.split(",").map((p) => p.trim()).slice(0, 3).join(", ");
 
-export const TRAVEL_LABELS: Record<TravelMode, string> = { car: "Driving", foot: "Walking", bike: "Cycling" };
+export const TRAVEL_LABELS: Record<TravelMode, string> = {
+  car: "Driving", foot: "Walking", bike: "Cycling", transit: "Public transport",
+};
+/** Modes offered right now — public transport only once a Google Maps key is connected. */
+export const travelModes = (transit: boolean) =>
+  (Object.keys(TRAVEL_LABELS) as TravelMode[]).filter((m) => m !== "transit" || transit);
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -85,6 +90,7 @@ export function AppointmentDialog({
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ["overview"] });
     qc.invalidateQueries({ queryKey: ["range"] });
+    qc.invalidateQueries({ queryKey: ["commute-next"] });
   };
 
   const save = useMutation({
@@ -254,7 +260,7 @@ export function AppointmentDialog({
                   <SelectItem value="default" data-testid="appointment-travel-default">
                     Default ({TRAVEL_LABELS[settings.data?.travelMode ?? "car"]})
                   </SelectItem>
-                  {(Object.keys(TRAVEL_LABELS) as TravelMode[]).map((m) => (
+                  {travelModes(!!settings.data?.transitAvailable).map((m) => (
                     <SelectItem key={m} value={m} data-testid={`appointment-travel-${m}`}>{TRAVEL_LABELS[m]}</SelectItem>
                   ))}
                 </SelectContent>

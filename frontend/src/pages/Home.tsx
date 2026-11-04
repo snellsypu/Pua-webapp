@@ -41,6 +41,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import { useDayPart } from "@/lib/useDayPart";
+import { LeaveCountdown } from "@/components/LeaveCountdown";
 
 export default function Home() {
   const overview = useQuery({
@@ -207,6 +208,8 @@ export default function Home() {
           </Button>
         </div>
       </div>
+
+      <LeaveCountdown />
 
       <div className="grid grid-cols-1 gap-6 md:grid-cols-12">
         <div className="md:col-span-5">

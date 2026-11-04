@@ -1,5 +1,6 @@
 """Settings singleton — home location, weather units, distance unit, timezone."""
 
+import os
 from datetime import datetime, timezone
 
 from fastapi import APIRouter
@@ -41,6 +42,7 @@ def _out(doc: dict) -> AppSettings:
         travelMode=doc.get("travelMode", "car"),
         liveLocation=bool(doc.get("liveLocation", False)),
         leaveAlerts=bool(doc.get("leaveAlerts", False)),
+        transitAvailable=bool(os.environ.get("GOOGLE_MAPS_API_KEY")),
     )
 
 

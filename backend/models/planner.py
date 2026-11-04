@@ -49,13 +49,13 @@ class Location(BaseModel):
     country: str | None = None
 
 
-TRAVEL_MODES = ("car", "foot", "bike")
+TRAVEL_MODES = ("car", "foot", "bike", "transit")  # transit needs GOOGLE_MAPS_API_KEY
 _HHMM = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
 
 
 def _travel_mode(v: str | None) -> str | None:
     if v is not None and v not in TRAVEL_MODES:
-        raise ValueError("travelMode must be car, foot or bike")
+        raise ValueError("travelMode must be car, foot, bike or transit")
     return v
 
 
@@ -74,6 +74,35 @@ class AppSettings(BaseModel):
     travelMode: str = "car"  # default for commute times: car | foot | bike
     liveLocation: bool = False  # Premium: commute from where the phone is, not home
     leaveAlerts: bool = False  # push "time to leave" before appointments (needs homeAddress)
+    transitAvailable: bool = False  # read-only: a Google Maps key is configured
+
+
+class CommuteNext(BaseModel):
+    """Next appointment today with a travel time — powers the Today countdown."""
+
+    appointmentId: str
+    title: str
+    startTime: str
+    location: str
+    mode: str
+    minutes: int
+    leaveBy: str  # HH:MM (start − travel − 10 min)
+    leaveInMin: int  # minutes from now until leaveBy (negative = late)
+    rainMinutes: int | None = None  # heavy rain on a walk/ride → driving time
+    rainLeaveBy: str | None = None
+
+
+class LocationSuggestion(BaseModel):
+    """An upcoming appointment with a free-text location and its best map match."""
+
+    appointmentId: str
+    title: str
+    date: str
+    startTime: str
+    location: str
+    matchName: str | None = None
+    matchLat: float | None = None
+    matchLon: float | None = None
 
 
 class DayPart(BaseModel):

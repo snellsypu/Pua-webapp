@@ -6,8 +6,10 @@ Durations are static road-network estimates, not live traffic."""
 import asyncio
 import hashlib
 import logging
+import os
 import time
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 
 import httpx
 
@@ -22,7 +24,44 @@ ROUTERS = {
     "foot": "https://routing.openstreetmap.de/routed-foot/route/v1/driving",
     "bike": "https://routing.openstreetmap.de/routed-bike/route/v1/driving",
 }
-MODE_WORDS = {"car": "by car", "foot": "on foot", "bike": "by bike"}
+MODE_WORDS = {"car": "by car", "foot": "on foot", "bike": "by bike", "transit": "by public transport"}
+GOOGLE_ROUTES_URL = "https://routes.googleapis.com/directions/v2:computeRoutes"
+
+
+def transit_available() -> bool:
+    return bool(os.environ.get("GOOGLE_MAPS_API_KEY"))
+
+
+async def transit_minutes(a: tuple[float, float], b: tuple[float, float], arrive_utc: datetime) -> int | None:
+    """Google Routes API, TRANSIT, arriving by `arrive_utc`. Cached per ~100 m + 15-min slot."""
+    key = os.environ.get("GOOGLE_MAPS_API_KEY")
+    if not key:
+        return None
+    slot = arrive_utc.replace(minute=arrive_utc.minute // 15 * 15, second=0, microsecond=0)
+    ck = _key("transit", f"{a[0]:.3f},{a[1]:.3f};{b[0]:.3f},{b[1]:.3f}", slot.isoformat())
+    hit = await db.route_cache.find_one({"_id": ck})
+    if hit:
+        return hit["minutes"]
+    body = {
+        "origin": {"location": {"latLng": {"latitude": a[0], "longitude": a[1]}}},
+        "destination": {"location": {"latLng": {"latitude": b[0], "longitude": b[1]}}},
+        "travelMode": "TRANSIT",
+        "arrivalTime": slot.strftime("%Y-%m-%dT%H:%M:%SZ"),
+    }
+    res = await _client().post(GOOGLE_ROUTES_URL, json=body, headers={
+        "X-Goog-Api-Key": key, "X-Goog-FieldMask": "routes.duration", "Content-Type": "application/json",
+    })
+    if res.status_code in (400, 403, 429) or res.status_code >= 500:
+        logger.warning("Google Routes %s: %s", res.status_code, res.text[:200])
+        return None
+    routes = res.json().get("routes") or []
+    if not routes:
+        return None
+    minutes = max(1, round(int(str(routes[0]["duration"]).rstrip("s")) / 60))
+    await db.route_cache.replace_one(
+        {"_id": ck}, {"_id": ck, "minutes": minutes, "at": datetime.now(timezone.utc)}, upsert=True
+    )
+    return minutes
 BUFFER_MIN = 10  # leave-by includes a little slack
 
 _lock = asyncio.Lock()
@@ -105,7 +144,7 @@ def _minus(hhmm: str, minutes: int) -> str:
     return f"{t // 60:02d}:{t % 60:02d}"
 
 
-async def commute(appt: dict, origin: tuple[float, float], mode: str) -> dict | None:
+async def commute(appt: dict, origin: tuple[float, float], mode: str, tz: str = "UTC") -> dict | None:
     """→ {minutes, leaveBy, mode} for an appointment with a location, or None if not routable."""
     place = (appt.get("location") or "").strip()
     if not place:
@@ -118,7 +157,15 @@ async def commute(appt: dict, origin: tuple[float, float], mode: str) -> dict | 
             if not found:
                 return None
             dest = (found[0]["latitude"], found[0]["longitude"])
-        minutes = await route_minutes(mode, origin, dest)
+        if mode == "transit":
+            try:
+                zone = ZoneInfo(tz)
+            except Exception:
+                zone = ZoneInfo("UTC")
+            arrive = datetime.fromisoformat(f"{appt['date']}T{appt['startTime']}").replace(tzinfo=zone)
+            minutes = await transit_minutes(origin, dest, arrive.astimezone(timezone.utc))
+        else:
+            minutes = await route_minutes(mode, origin, dest)
     except Exception:
         logger.warning("commute lookup failed for %r", place, exc_info=True)
         return None

@@ -11,6 +11,8 @@ class WeatherNow(BaseModel):
     apparent: float
     code: int
     isDay: bool
+    windSpeed: float = 0  # km/h
+    windGusts: float = 0  # km/h
 
 
 class HourPoint(BaseModel):
@@ -18,6 +20,7 @@ class HourPoint(BaseModel):
     temperature: float
     precipProb: float
     code: int
+    windSpeed: float = 0  # km/h
 
 
 class WeatherDay(BaseModel):

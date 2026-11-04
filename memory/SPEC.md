@@ -99,6 +99,23 @@ tomorrow's preview). Public URL: https://daily-loop-8--68ipsq2d.preview.emergent
   the 5-min cron (`push._leave_alerts`) checks today's appointments with a location starting in
   the next 4 h and pushes "Time to leave" ~5 min before the leave-by time (from home; rain
   advice included), once per appointment per day (`appointments.leaveAlertDate`).
+- **Public transport** (`travelMode` "transit", Google Routes API computeRoutes, TRANSIT with
+  arrivalTime = appointment start in settings.timezone → UTC, field mask routes.duration, key
+  `GOOGLE_MAPS_API_KEY` in backend/.env, cached per 15-min slot in route_cache). Offered in the
+  mode selects only when `AppSettings.transitAvailable` (read-only, key present); without a key a
+  stored "transit" falls back to car. No route → "I couldn't find a public transport route".
+- **Leave countdown** (Today, components/LeaveCountdown.tsx): `GET /api/commute/next[?lat&lon]`
+  → `CommuteNext` for the next appointment today within 6 h that has a travel time (null
+  otherwise); client ticks `leaveInMin` down every second (mm:ss under 10 min, rose ≤ 5 min,
+  "Leave now"), refetch every 5 min; rain → driving alternative line.
+- **Pin appointment places** (Settings → Commute times, components/PinLocations.tsx):
+  "Find matches" → `GET /api/commute/unpinned` → upcoming 60-day appointments with text-only
+  locations + best Nominatim match near home (≤ 80 km, ≤ 8 distinct places per tap) → "Pin"
+  saves locationLat/Lon; no match → "Edit" opens the appointment dialog (Find there).
+- **Run weather** (components/RunWeather.tsx, on distance-tracking habits not done today):
+  max precip of this + next hour and wind/gusts (Open-Meteo `wind_speed_10m`/`wind_gusts_10m`,
+  km/h; shown in mph when distance unit is mi) → verdict chip (rain ≥ 60 % / wind ≥ 35 or
+  gusts ≥ 55 → warn; rain ≥ 30 % → showers; else "Good time for a run").
 - **Hands-free routine** (components/HandsFreeRoutine.tsx): "Hands-free" button on routine cards
   (when not complete) and on the read-out banners. Speaks each open step, listens (browser
   recognition) for done/next → toggles the step; skip; repeat; stop. Ends with the streak.

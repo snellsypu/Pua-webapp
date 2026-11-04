@@ -83,9 +83,12 @@ def _origin(settings: dict, live: tuple[float, float] | None) -> tuple[tuple[flo
 
 
 def _mode(settings: dict, appt: dict) -> str:
-    if settings.get("premiumVoice") and appt.get("travelMode") in travel.ROUTERS:
+    """Per-appointment mode (Premium) → default mode → car. Transit falls back to car
+    while no Google Maps key is configured."""
+    ok = set(travel.ROUTERS) | ({"transit"} if travel.transit_available() else set())
+    if settings.get("premiumVoice") and appt.get("travelMode") in ok:
         return appt["travelMode"]
-    return settings.get("travelMode") if settings.get("travelMode") in travel.ROUTERS else "car"
+    return settings.get("travelMode") if settings.get("travelMode") in ok else "car"
 
 
 HEAVY_RAIN_CODES = {63, 65, 66, 67, 81, 82, 95, 96, 99}
@@ -121,13 +124,16 @@ async def plan_commute(settings: dict, appt: dict, live: tuple[float, float] | N
     origin, from_words = _origin(settings, live)
     if not origin:
         return "Add your home address in Settings and I'll tell you when to leave."
-    c = await travel.commute(appt, origin, _mode(settings, appt))
+    tz = settings.get("timezone") or "UTC"
+    c = await travel.commute(appt, origin, _mode(settings, appt), tz)
     if not c:
+        if _mode(settings, appt) == "transit":
+            return f"I couldn't find a public transport route to {appt['location']}."
         return f"I couldn't find {appt['location']} on the map for a travel time."
     c["fromWords"] = from_words
     c["rain"] = None
     if c["mode"] in ("foot", "bike") and await rain_likely(settings, appt["date"], appt["startTime"]):
-        car = await travel.commute(appt, origin, "car")
+        car = await travel.commute(appt, origin, "car", tz)
         if car:
             c["rain"] = {"minutes": car["minutes"], "leaveBy": car["leaveBy"]}
     return c

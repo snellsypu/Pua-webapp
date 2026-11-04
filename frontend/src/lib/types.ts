@@ -10,7 +10,7 @@ export interface Location {
 }
 
 export type DistanceUnit = "km" | "mi";
-export type TravelMode = "car" | "foot" | "bike";
+export type TravelMode = "car" | "foot" | "bike" | "transit"; // transit needs a Google Maps key
 
 export interface AppSettings {
   id: string;
@@ -27,6 +27,32 @@ export interface AppSettings {
   travelMode: TravelMode;
   liveLocation: boolean; // Premium: commute from the phone's location
   leaveAlerts: boolean; // "time to leave" pushes before appointments
+  transitAvailable: boolean; // read-only: Google Maps key configured
+}
+
+// Mirrors CommuteNext / LocationSuggestion in backend/models/planner.py
+export interface CommuteNext {
+  appointmentId: string;
+  title: string;
+  startTime: string;
+  location: string;
+  mode: TravelMode;
+  minutes: number;
+  leaveBy: string;
+  leaveInMin: number;
+  rainMinutes: number | null;
+  rainLeaveBy: string | null;
+}
+
+export interface LocationSuggestion {
+  appointmentId: string;
+  title: string;
+  date: string;
+  startTime: string;
+  location: string;
+  matchName: string | null;
+  matchLat: number | null;
+  matchLon: number | null;
 }
 
 // Mirrors DayPart in backend/models/planner.py
@@ -172,6 +198,8 @@ export interface WeatherNow {
   apparent: number;
   code: number;
   isDay: boolean;
+  windSpeed: number; // km/h
+  windGusts: number; // km/h
 }
 
 export interface HourPoint {
@@ -179,6 +207,7 @@ export interface HourPoint {
   temperature: number;
   precipProb: number;
   code: number;
+  windSpeed: number; // km/h
 }
 
 export interface WeatherDay {
