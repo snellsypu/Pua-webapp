@@ -1,0 +1,13 @@
+{
+  "name": "Daily Loop",
+  "short_name": "Daily Loop",
+  "description": "Calendar with habits, appointments, reminders, morning briefings and evening reviews.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FBF9F5",
+  "theme_color": "#0F766E",
+  "icons": [
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/apple-touch-icon.png", "sizes": "180x180", "type": "image/png", "purpose": "any" }
+  ]
+}

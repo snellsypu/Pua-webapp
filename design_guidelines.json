@@ -1,0 +1,163 @@
+{
+  "theme_archetype": "ORGANIC_WARM_PRODUCTIVITY_HYBRID",
+  "archetype_description": "Tactile Editorial Planner — combines Swiss typographic grid structure with warm organic botanical warmth (warm cream stone base, deep slate pine text, amber sunrise and twilight violet highlights) for a serene, mindful day planning experience.",
+  "colors": {
+    "surfaces": [
+      {
+        "name": "page",
+        "kind": "solid",
+        "bg": "#FBF9F5",
+        "on_bg": "#1C2421",
+        "on_bg_muted": "#5C6762",
+        "roles": {
+          "link": "#0F5132",
+          "error": "#B91C1C",
+          "success": "#15803D",
+          "warning": "#B45309"
+        }
+      },
+      {
+        "name": "page_dark",
+        "kind": "solid",
+        "bg": "#121715",
+        "on_bg": "#F5F3ED",
+        "on_bg_muted": "#9CA3AF",
+        "roles": {
+          "link": "#34D399",
+          "error": "#F87171",
+          "success": "#4ADE80",
+          "warning": "#FBBF24"
+        }
+      },
+      {
+        "name": "panel",
+        "kind": "solid",
+        "bg": "#FFFFFF",
+        "on_bg": "#1C2421",
+        "on_bg_muted": "#64748B",
+        "roles": {
+          "border": "#E8E4DA",
+          "hover_bg": "#F4F1EA"
+        }
+      },
+      {
+        "name": "panel_dark",
+        "kind": "solid",
+        "bg": "#1B221F",
+        "on_bg": "#F5F3ED",
+        "on_bg_muted": "#94A3B8",
+        "roles": {
+          "border": "#2D3732",
+          "hover_bg": "#242E2A"
+        }
+      },
+      {
+        "name": "widget_morning",
+        "kind": "solid",
+        "bg": "#FEF3C7",
+        "on_bg": "#78350F",
+        "on_bg_muted": "#92400E",
+        "roles": {
+          "icon": "#D97706",
+          "border": "#FDE68A"
+        }
+      },
+      {
+        "name": "widget_evening",
+        "kind": "solid",
+        "bg": "#EDE9FE",
+        "on_bg": "#4C1D95",
+        "on_bg_muted": "#5B21B6",
+        "roles": {
+          "icon": "#7C3AED",
+          "border": "#DDD6FE"
+        }
+      },
+      {
+        "name": "habit_streak_badge",
+        "kind": "solid",
+        "bg": "#FFEDD5",
+        "on_bg": "#9A3412",
+        "on_bg_muted": "#C2410C"
+      },
+      {
+        "name": "habit_counter_badge",
+        "kind": "solid",
+        "bg": "#E0E7FF",
+        "on_bg": "#3730A3",
+        "on_bg_muted": "#4338CA"
+      },
+      {
+        "name": "inverse",
+        "kind": "solid",
+        "bg": "#1C2421",
+        "on_bg": "#FBF9F5",
+        "on_bg_muted": "#D1D5DB"
+      }
+    ],
+    "accent": "#0F766E",
+    "on_accent": "#FFFFFF",
+    "accent_warm": "#D97706",
+    "on_accent_warm": "#FFFFFF"
+  },
+  "typography": {
+    "font_family_heading": "Outfit Variable, sans-serif",
+    "font_family_body": "DM Sans Variable, sans-serif",
+    "font_family_mono": "IBM Plex Mono, monospace",
+    "scale_px": {
+      "display": 48,
+      "h1": 36,
+      "h2": 28,
+      "h3": 20,
+      "body": 16,
+      "caption": 14
+    },
+    "pairing_rules": "Use Outfit Variable (weight 600-800, tracking-tight) for bold calendar dates, morning/evening ritual titles, and widget headers. Use DM Sans (weight 400-500) for readable agenda items, notes, recipe slots, and shopping list items. Use IBM Plex Mono for timestamps (e.g., '08:30 AM'), temperature readings ('72°F / 22°C'), habit streaks ('🔥 14 days'), and counter ratios ('18/20')."
+  },
+  "entry_surfaces": {
+    "/": "Modular day dashboard grid — hero morning weather card top left, quick action launcher top right, today's time-blocked appointments left column, habits checklist & counter trackers center, and meals + shopping peek right column.",
+    "/morning": "Morning Overview briefing ritual — high-impact weather hero panel with hourly forecast, today's schedule agenda timeline, habit intentions, and breakfast/lunch preview.",
+    "/evening": "Evening Review reflective sanctuary — daily habit completion streak scorecard, reflection notes, and tomorrow's preview (appointments, tomorrow's meals, weather, and reminders).",
+    "/calendar": "Interactive Monthly & Weekly calendar view with day-drilldown drawer showing appointments, habit heat-grid, and meal allocations.",
+    "/habits": "Habit command center with toggle views for Streak Mode (daily flame counters) vs Monthly Counter Mode (progress rings & monthly targets).",
+    "/planner": "Meal plans (breakfast/lunch/dinner/snack) with one-click 'Send ingredients to Shopping List' and interactive grocery list drawer.",
+    "/settings": "Preferences center — default home city selection, geolocation auto-detect switch, weather units (°C/°F), and light/dark theme switch."
+  },
+  "visual_enhancers": {
+    "glassmorphism": "Used for sticky top navigation bar (backdrop-blur-md bg-white/80 dark:bg-[#121715]/80 border-b border-[#E8E4DA] dark:border-[#2D3732]).",
+    "widget_aesthetics": "Tactile card styling with subtle 1px border (`border-[#E8E4DA] dark:border-[#2D3732]`), warm ambient drop shadows (`shadow-sm hover:shadow-md transition-shadow duration-200`), and rounded-2xl radii.",
+    "ambient_gradients": "Warm morning glow (`bg-gradient-to-br from-amber-500/10 via-orange-500/5 to-transparent`) on Morning Overview; twilight glow (`bg-gradient-to-br from-indigo-500/10 via-purple-500/5 to-transparent`) on Evening Review.",
+    "pwa_home_widget": "A dedicated 'Compact Widget View' toggle mode on the home screen designed specifically for quick mobile glances and tablet dashboard stands."
+  },
+  "grids": {
+    "home_bento_grid": "grid grid-cols-1 md:grid-cols-12 gap-6",
+    "calendar_grid": "grid grid-cols-7 gap-2 sm:gap-3",
+    "morning_evening_split": "grid grid-cols-1 lg:grid-cols-12 gap-8"
+  },
+  "motion": {
+    "library": "motion/react",
+    "interactions": [
+      "Habit check-off: spring scale-up micro-bounce (scale: [1, 1.15, 1]) + subtle celebratory burst on target completion",
+      "Page transitions: smooth fade and subtle upward slide (opacity 0 to 1, y: 12 to 0, ease: 'easeOut', duration: 0.25)",
+      "Shopping list check-off: strikethrough animation with smooth opacity fade to 0.5",
+      "Date slider: horizontal momentum drag and tap transitions for quick day-switching"
+    ]
+  },
+  "accessibility": {
+    "contrast_standard": "All text tokens meet APCA and WCAG 2.1 AA (4.5:1 for standard text, 3:1 for large headers).",
+    "keyboard_navigation": "Full keyboard accessibility across all modals, calendar cell selections, habit check boxes, and shopping list items with distinct focus-visible rings (focus-visible:ring-2 focus-visible:ring-teal-600).",
+    "reduced_motion": "All motion transitions respect `prefers-reduced-motion: reduce` by degrading to instant opacity switches."
+  },
+  "testing_attributes": {
+    "rule": "Every interactive button, modal trigger, tab, habit checkbox, appointment item, meal slot, and theme toggle MUST have unambiguous data-testid attributes."
+  },
+  "instructions_to_main_agent": [
+    "1. Read this guidelines file to adhere to the warm organic productivity archetype and typography pairing.",
+    "2. Ensure index.css uses Outfit Variable for headings and DM Sans Variable for body.",
+    "3. Build full FastAPI endpoints in backend for appointments, habits (streak and monthly counter modes), reminders, meals, shopping list, settings (location, theme, units), and Open-Meteo weather caching.",
+    "4. Implement the Home Widget dashboard, Morning Overview page (/morning), Evening Review page (/evening), Calendar view (/calendar), Habits page (/habits), Meal & Shopping Planner (/planner), and Settings page (/settings).",
+    "5. Integrate Open-Meteo API for real-time weather and forecasts with browser geolocation fallback + home city fallback.",
+    "6. Ensure dark mode toggle seamlessly updates the html.dark class and persists user preference.",
+    "7. Add realistic seed data so the user opens a populated, lively day planner ready for immediate demonstration."
+  ]
+}
