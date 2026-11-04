@@ -108,6 +108,21 @@ async def main() -> None:
           f"appointments=5 meals={len(meals)} reminders=3 shopping=5 (today={today_iso()})")
 
 
+async def seed_distance() -> None:
+    """Idempotent: make "Morning run" a distance habit with a few logged runs."""
+    run = await db.habits.find_one({"name": "Morning run"})
+    if run and not run.get("tracksDistance"):
+        await db.habits.update_one({"id": run["id"]}, {"$set": {"tracksDistance": True}})
+        for i, c in enumerate(await db.habit_completions.find({"habitId": run["id"]}).sort("date", 1).to_list(50)):
+            await db.habit_completions.update_one(
+                {"habitId": run["id"], "date": c["date"]}, {"$set": {"distanceKm": [5.0, 6.2, 4.8, 7.1][i % 4]}}
+            )
+        print("seed: Morning run now tracks distance")
+    await db.health_events.update_one(
+        {"eventId": "seed-exercise-1", "distanceKm": {"$exists": False}}, {"$set": {"distanceKm": 5.4}}
+    )
+
+
 async def seed_health() -> None:
     """Samsung Health demo events — own guard so it runs on an already-seeded DB."""
     if await db.health_events.count_documents({}) == 0:
@@ -140,5 +155,10 @@ async def seed_health() -> None:
         print("seed: planted 4 Samsung Health demo events")
 
 
+async def run_all() -> None:
+    await main()
+    await seed_distance()
+
+
 if __name__ == "__main__":
-    asyncio.run(main())
+    asyncio.run(run_all())

@@ -7,6 +7,7 @@ TS interfaces in frontend/src/lib/types.ts — keep the two in sync in one edit.
 import re
 import uuid
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -15,6 +16,7 @@ TIME_RE = re.compile(r"^\d{2}:\d{2}$")
 MEAL_SLOTS = ("breakfast", "lunch", "dinner", "snack")
 HABIT_MODES = ("streak", "monthly")
 UNITS = ("celsius", "fahrenheit")
+DISTANCE_UNITS = ("km", "mi")
 
 
 def _uuid() -> str:
@@ -51,18 +53,41 @@ class AppSettings(BaseModel):
     id: str = "app"
     home: Location | None = None
     units: str = "celsius"
+    distanceUnit: str = "km"
+    timezone: str = "UTC"  # IANA zone from the browser; drives routine notification times
 
 
 class SettingsUpdate(BaseModel):
-    # Full-state PUT: home=null clears the home location, units is always sent.
+    # Partial PUT: only fields that are sent change (exclude_unset); an explicit
+    # home=null clears the home location.
     home: Location | None = None
-    units: str = "celsius"
+    units: str | None = None
+    distanceUnit: str | None = None
+    timezone: str | None = None
 
     @field_validator("units")
     @classmethod
-    def _check_units(cls, v: str) -> str:
-        if v not in UNITS:
+    def _check_units(cls, v: str | None) -> str | None:
+        if v is not None and v not in UNITS:
             raise ValueError("units must be celsius or fahrenheit")
+        return v
+
+    @field_validator("distanceUnit")
+    @classmethod
+    def _check_distance_unit(cls, v: str | None) -> str | None:
+        if v is not None and v not in DISTANCE_UNITS:
+            raise ValueError("distanceUnit must be km or mi")
+        return v
+
+    @field_validator("timezone")
+    @classmethod
+    def _check_tz(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        try:
+            ZoneInfo(v)
+        except Exception as exc:  # unknown zone name
+            raise ValueError("unknown timezone") from exc
         return v
 
 
@@ -137,6 +162,7 @@ class Habit(BaseModel):
     emoji: str = "🎯"
     mode: str = "streak"  # streak | monthly
     monthlyTarget: int = 12  # only used by monthly mode
+    tracksDistance: bool = False  # running habit: log km per check-off + Samsung runs
     createdAt: datetime = Field(default_factory=_now)
 
 
@@ -145,6 +171,7 @@ class HabitCreate(BaseModel):
     emoji: str = "🎯"
     mode: str = "streak"
     monthlyTarget: int = 12
+    tracksDistance: bool = False
 
     @field_validator("mode")
     @classmethod
@@ -164,6 +191,7 @@ class HabitUpdate(BaseModel):
     emoji: str | None = None
     mode: str | None = None
     monthlyTarget: int | None = None
+    tracksDistance: bool | None = None
 
     @field_validator("mode")
     @classmethod
@@ -188,17 +216,38 @@ class HabitStats(BaseModel):
     streak: int
     bestStreak: int
     monthCount: int
+    tracksDistance: bool = False
+    # Distance totals (always stored in km; the UI converts to the user's unit).
+    # Per day: the distance typed at check-off wins; otherwise Samsung Health runs.
+    todayKm: float = 0
+    weekKm: float = 0  # Monday → today
+    monthKm: float = 0
+    totalKm: float = 0
 
 
 class HabitCompletion(BaseModel):
     habitId: str
     date: str
+    distanceKm: float | None = None
 
 
 class HabitToggleOut(BaseModel):
     habitId: str
     date: str
     done: bool
+    distanceKm: float | None = None
+
+
+class HabitLog(BaseModel):
+    """Check a habit off for a date with a distance (upserts the completion)."""
+
+    date: str | None = None
+    distanceKm: float | None = Field(default=None, ge=0, le=500)
+
+    @field_validator("date")
+    @classmethod
+    def _check_date(cls, v: str | None) -> str | None:
+        return _valid_date(v) if v is not None else None
 
 
 # ---------------------------------------------------------------- meals

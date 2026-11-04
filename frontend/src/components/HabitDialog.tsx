@@ -11,6 +11,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -37,6 +38,7 @@ export function HabitDialog({
   const [emoji, setEmoji] = useState("🎯");
   const [mode, setMode] = useState<"streak" | "monthly">("streak");
   const [target, setTarget] = useState(12);
+  const [tracksDistance, setTracksDistance] = useState(false);
 
   useEffect(() => {
     if (open) {
@@ -44,12 +46,19 @@ export function HabitDialog({
       setEmoji(initial?.emoji ?? "🎯");
       setMode(initial?.mode ?? "streak");
       setTarget(initial?.monthlyTarget ?? 12);
+      setTracksDistance(initial?.tracksDistance ?? false);
     }
   }, [open, initial]);
 
   const save = useMutation({
     mutationFn: () => {
-      const payload: HabitCreate = { name: name.trim(), emoji, mode, monthlyTarget: target };
+      const payload: HabitCreate = {
+        name: name.trim(),
+        emoji,
+        mode,
+        monthlyTarget: target,
+        tracksDistance,
+      };
       return initial ? apiPut(`/habits/${initial.id}`, payload) : apiPost("/habits", payload);
     },
     onSuccess: () => {
@@ -135,6 +144,21 @@ export function HabitDialog({
               />
             </div>
           )}
+          <label className="flex items-start gap-2.5 rounded-xl border p-3" htmlFor="habit-distance">
+            <Checkbox
+              id="habit-distance"
+              checked={tracksDistance}
+              onCheckedChange={(c) => setTracksDistance(c === true)}
+              data-testid="habit-distance-checkbox"
+            />
+            <span className="grid gap-0.5">
+              <span className="text-sm font-medium">Track running distance</span>
+              <span className="text-xs text-muted-foreground">
+                Asks how far when you check it off, adds Samsung Health runs, and keeps weekly and
+                monthly totals.
+              </span>
+            </span>
+          </label>
         </div>
         <DialogFooter className="mt-2 gap-2 sm:justify-between">
           {initial ? (

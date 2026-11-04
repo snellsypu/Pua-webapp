@@ -34,6 +34,17 @@ INDEXES: dict[str, list[IndexModel]] = {
     "health_events": [
         IndexModel([("eventId", ASCENDING)], name="event_id", unique=True),
         IndexModel([("date", ASCENDING), ("start", ASCENDING)], name="date_start"),
+        IndexModel([("type", ASCENDING), ("date", ASCENDING)], name="type_date"),
+    ],
+    "routines": [IndexModel([("kind", ASCENDING)], name="kind", unique=True)],
+    "routine_checks": [
+        IndexModel([("kind", ASCENDING), ("date", ASCENDING)], name="kind_date", unique=True),
+        IndexModel([("kind", ASCENDING), ("complete", ASCENDING)], name="kind_complete"),
+    ],
+    "push_subscriptions": [IndexModel([("endpoint", ASCENDING)], name="endpoint", unique=True)],
+    "cron_runs": [
+        IndexModel([("runId", ASCENDING)], name="run_id", unique=True),
+        IndexModel([("at", ASCENDING)], name="at_ttl", expireAfterSeconds=7 * 24 * 3600),
     ],
 }
 

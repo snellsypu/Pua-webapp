@@ -3,8 +3,9 @@ import { useQuery } from "@tanstack/react-query";
 import { motion } from "motion/react";
 import { Flame, Plus } from "lucide-react";
 import { apiGet } from "@/lib/api";
-import type { DayContext, HabitStats, RangeBundle } from "@/lib/types";
-import { useToggleHabit } from "@/components/HabitList";
+import type { AppSettings, DayContext, HabitStats, RangeBundle } from "@/lib/types";
+import { useHabitCheck } from "@/components/HabitList";
+import { fmtDist } from "@/lib/units";
 import { HabitDialog } from "@/components/HabitDialog";
 import { addDaysIso } from "@/lib/dates";
 import { Badge } from "@/components/ui/badge";
@@ -43,7 +44,9 @@ export default function Habits() {
 
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<HabitStats | null>(null);
-  const toggle = useToggleHabit();
+  const { check, dialog, pending } = useHabitCheck();
+  const settings = useQuery({ queryKey: ["settings"], queryFn: () => apiGet<AppSettings>("/settings") });
+  const unit = settings.data?.distanceUnit ?? "km";
 
   return (
     <motion.div
@@ -52,6 +55,7 @@ export default function Habits() {
       transition={{ duration: 0.25, ease: "easeOut" }}
       className="space-y-6"
     >
+      {dialog}
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="font-heading text-3xl font-bold tracking-tight">Habits</h1>
@@ -130,11 +134,28 @@ export default function Habits() {
                       variant={h.doneToday ? "default" : "outline"}
                       size="sm"
                       data-testid={`habit-today-check-${h.id}`}
-                      onClick={() => toggle.mutate({ id: h.id, name: h.name })}
+                      disabled={pending}
+                      onClick={() => check(h)}
                     >
                       {h.doneToday ? "Done today" : "Check off today"}
                     </Button>
                   </div>
+                  {h.tracksDistance && (
+                    <div className="grid grid-cols-3 gap-2" data-testid={`habit-distance-tiles-${h.id}`}>
+                      {[
+                        { label: "This week", km: h.weekKm, id: "week" },
+                        { label: "This month", km: h.monthKm, id: "month" },
+                        { label: "All time", km: h.totalKm, id: "total" },
+                      ].map((t) => (
+                        <div key={t.id} className="rounded-xl bg-muted/70 px-3 py-2">
+                          <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{t.label}</div>
+                          <div className="font-mono text-base font-semibold" data-testid={`habit-distance-${t.id}-${h.id}`}>
+                            {fmtDist(t.km, unit)}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                   {h.mode === "monthly" && (
                     <div className="h-2 overflow-hidden rounded-full bg-muted">
                       <div

@@ -9,15 +9,22 @@ export interface Location {
   country?: string | null;
 }
 
+export type DistanceUnit = "km" | "mi";
+
 export interface AppSettings {
   id: string;
   home: Location | null;
   units: "celsius" | "fahrenheit";
+  distanceUnit: DistanceUnit;
+  timezone: string;
 }
 
+// Partial PUT — only the fields sent change. home: null clears the home city.
 export interface SettingsUpdate {
-  home: Location | null;
-  units: "celsius" | "fahrenheit";
+  home?: Location | null;
+  units?: "celsius" | "fahrenheit";
+  distanceUnit?: DistanceUnit;
+  timezone?: string;
 }
 
 export interface Appointment {
@@ -51,6 +58,12 @@ export interface HabitStats {
   streak: number;
   bestStreak: number;
   monthCount: number;
+  tracksDistance: boolean;
+  // Always km on the wire; convert with lib/units for display.
+  todayKm: number;
+  weekKm: number;
+  monthKm: number;
+  totalKm: number;
 }
 
 export interface HabitCreate {
@@ -58,17 +71,25 @@ export interface HabitCreate {
   emoji: string;
   mode: HabitMode;
   monthlyTarget: number;
+  tracksDistance: boolean;
 }
 
 export interface HabitToggleOut {
   habitId: string;
   date: string;
   done: boolean;
+  distanceKm: number | null;
+}
+
+export interface HabitLog {
+  date?: string;
+  distanceKm: number | null;
 }
 
 export interface HabitCompletion {
   habitId: string;
   date: string;
+  distanceKm: number | null;
 }
 
 export type MealSlot = "breakfast" | "lunch" | "dinner" | "snack";
@@ -168,6 +189,7 @@ export interface HealthEvent {
   end: string;
   title: string | null;
   durationMin: number | null;
+  distanceKm: number | null;
   calories: number | null;
   proteinG: number | null;
   carbsG: number | null;
@@ -181,4 +203,46 @@ export interface HealthImportResult {
   imported: number;
   byType: Record<string, number>;
   files: string[];
+}
+
+// Mirrors backend/models/routines.py
+export type RoutineKind = "morning" | "bedtime";
+
+export interface RoutineStep {
+  id: string;
+  text: string;
+}
+
+export interface RoutineState {
+  kind: RoutineKind;
+  title: string;
+  time: string;
+  notify: boolean;
+  steps: RoutineStep[];
+  date: string;
+  doneStepIds: string[];
+  complete: boolean;
+  streak: number;
+  bestStreak: number;
+}
+
+export interface RoutineUpdate {
+  time?: string;
+  notify?: boolean;
+  steps?: { id?: string; text: string }[];
+}
+
+// Mirrors backend/models/push.py
+export interface PushPublicKey {
+  publicKey: string;
+}
+
+export interface PushStatus {
+  subscriptions: number;
+}
+
+export interface PushSendResult {
+  sent: number;
+  removed: number;
+  failed: number;
 }

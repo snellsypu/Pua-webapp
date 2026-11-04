@@ -1,7 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { motion } from "motion/react";
 import { apiGet } from "@/lib/api";
-import type { DayContext, HabitStats } from "@/lib/types";
+import type { DayContext, HabitStats, RoutineState } from "@/lib/types";
+import { RoutineCard } from "@/components/RoutineCard";
 import { useWeather } from "@/lib/useWeather";
 import { addDaysIso, fmtDay, fmtShort } from "@/lib/dates";
 import { fmtDeg, weatherCodeInfo } from "@/lib/weatherCodes";
@@ -22,6 +23,10 @@ export default function Evening() {
     queryFn: () => apiGet<DayContext>("/overview?offset=1"),
   });
   const habits = useQuery({ queryKey: ["habits"], queryFn: () => apiGet<HabitStats[]>("/habits") });
+  const routines = useQuery({
+    queryKey: ["routines"],
+    queryFn: () => apiGet<RoutineState[]>("/routines"),
+  });
   const weather = useWeather();
 
   const today = todayQ.data;
@@ -62,6 +67,11 @@ export default function Evening() {
           </Badge>
         </div>
       </section>
+
+      <RoutineCard
+        loading={routines.isLoading}
+        routine={routines.data?.find((r) => r.kind === "bedtime")}
+      />
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
         <Card className="lg:col-span-5">

@@ -11,6 +11,7 @@ class HealthEvent(BaseModel):
     end: str
     title: str | None = None
     durationMin: float | None = None
+    distanceKm: float | None = None
     calories: float | None = None
     proteinG: float | None = None
     carbsG: float | None = None

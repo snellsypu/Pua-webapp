@@ -4,8 +4,9 @@ import { motion } from "motion/react";
 import { toast } from "sonner";
 import { Dumbbell, FileArchive, Moon, Trash2, Upload, Utensils } from "lucide-react";
 import { apiDelete, apiGet, apiUpload, ApiError } from "@/lib/api";
-import type { DayContext, HealthEvent, HealthImportResult, HealthType } from "@/lib/types";
+import type { AppSettings, DayContext, HealthEvent, HealthImportResult, HealthType } from "@/lib/types";
 import { addDaysIso, fmtShort } from "@/lib/dates";
+import { fmtDist } from "@/lib/units";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -33,6 +34,8 @@ export default function Health() {
   });
   const today = todayQ.data?.date;
   const from = today ? addDaysIso(today, -13) : undefined;
+  const settings = useQuery({ queryKey: ["settings"], queryFn: () => apiGet<AppSettings>("/settings") });
+  const unit = settings.data?.distanceUnit ?? "km";
 
   const events = useQuery({
     queryKey: ["health", from, today],
@@ -169,6 +172,7 @@ export default function Health() {
                         const Icon = m.icon;
                         const bits = [
                           fmtMins(e.durationMin),
+                          e.distanceKm != null ? fmtDist(e.distanceKm, unit) : null,
                           e.calories != null ? `${Math.round(e.calories)} kcal` : null,
                           e.proteinG != null ? `P ${Math.round(e.proteinG)}g` : null,
                           e.score != null ? `score ${Math.round(e.score)}` : null,

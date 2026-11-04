@@ -5,7 +5,8 @@ import { toast } from "sonner";
 import { useTheme } from "next-themes";
 import { Check, LocateFixed, MapPin, Search } from "lucide-react";
 import { apiGet, apiPut } from "@/lib/api";
-import type { AppSettings, GeoPlace, ReversePlace } from "@/lib/types";
+import type { AppSettings, GeoPlace, ReversePlace, SettingsUpdate } from "@/lib/types";
+import { NotificationsCard } from "@/components/NotificationsCard";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -37,14 +38,8 @@ export default function Settings() {
   const [searching, setSearching] = useState(false);
 
   const save = useMutation({
-    mutationFn: (v: { home?: GeoPlace | null; units?: "celsius" | "fahrenheit" }) =>
-      apiPut<AppSettings>("/settings", {
-        home:
-          v.home !== undefined
-            ? v.home
-            : (settings.data?.home ?? null),
-        units: v.units ?? settings.data?.units ?? "celsius",
-      }),
+    // Partial update — only the field being changed is sent.
+    mutationFn: (v: SettingsUpdate) => apiPut<AppSettings>("/settings", v),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["settings"] });
       qc.invalidateQueries({ queryKey: ["weather"] });
@@ -227,8 +222,29 @@ export default function Settings() {
               </SelectContent>
             </Select>
           </div>
+          <div className="grid gap-1.5">
+            <Label htmlFor="distance-unit">Distance units</Label>
+            <Select
+              value={settings.data?.distanceUnit ?? "km"}
+              onValueChange={(v: string) => save.mutate({ distanceUnit: v as "km" | "mi" })}
+            >
+              <SelectTrigger id="distance-unit" className="w-48" data-testid="settings-distance-select">
+                <SelectValue>{(u: string) => (u === "mi" ? "Miles (mi)" : "Kilometres (km)")}</SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="km" data-testid="settings-distance-km">
+                  Kilometres (km)
+                </SelectItem>
+                <SelectItem value="mi" data-testid="settings-distance-mi">
+                  Miles (mi)
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </CardContent>
       </Card>
+
+      <NotificationsCard />
 
       <Card className={cn("border-dashed")}>
         <CardHeader>

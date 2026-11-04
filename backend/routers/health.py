@@ -36,6 +36,13 @@ KIND_FRAGMENTS: dict[str, str] = {
 }
 
 
+# Samsung exports exercise_type as a numeric code.
+EXERCISE_CODES = {
+    "1001": "Walking", "1002": "Running", "11007": "Cycling", "13001": "Hiking",
+    "14001": "Swimming", "15003": "Treadmill running", "15005": "Elliptical",
+}
+
+
 def kind_for(name: str) -> str | None:
     n = name.lower()
     for fragment, kind in KIND_FRAGMENTS.items():
@@ -140,6 +147,7 @@ def normalize(kind: str, row: dict, source: str) -> HealthEvent | None:
         "end": end,
         "title": None,
         "durationMin": None,
+        "distanceKm": None,
         "calories": None,
         "proteinG": None,
         "carbsG": None,
@@ -155,7 +163,10 @@ def normalize(kind: str, row: dict, source: str) -> HealthEvent | None:
         event["carbsG"] = number(col(row, "carbohydrate", "carbs", "carbs_g"))
         event["fatG"] = number(col(row, "fat", "fat_g"))
     elif kind == "exercise":
-        event["title"] = col(row, "exercise_type", "exercise", "name", "activity")
+        raw_type = col(row, "exercise_type", "exercise", "name", "activity")
+        event["title"] = EXERCISE_CODES.get(str(raw_type).strip(), raw_type) if raw_type is not None else None
+        meters = number(col(row, "distance"))  # Samsung stores metres
+        event["distanceKm"] = round(meters / 1000, 2) if meters else None
         event["durationMin"] = duration_minutes(number(col(row, "duration", "duration_min")))
         event["calories"] = number(col(row, "calorie", "calories", "calories_burned"))
     else:  # sleep

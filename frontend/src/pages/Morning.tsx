@@ -2,7 +2,8 @@ import { useQuery } from "@tanstack/react-query";
 import { motion } from "motion/react";
 import { Umbrella } from "lucide-react";
 import { apiGet } from "@/lib/api";
-import type { DayContext, HabitStats } from "@/lib/types";
+import type { DayContext, HabitStats, RoutineState } from "@/lib/types";
+import { RoutineCard } from "@/components/RoutineCard";
 import { useWeather } from "@/lib/useWeather";
 import { fmtDay } from "@/lib/dates";
 import { WeatherCard } from "@/components/WeatherCard";
@@ -21,6 +22,10 @@ export default function Morning() {
     queryFn: () => apiGet<DayContext>("/overview?offset=0"),
   });
   const habits = useQuery({ queryKey: ["habits"], queryFn: () => apiGet<HabitStats[]>("/habits") });
+  const routines = useQuery({
+    queryKey: ["routines"],
+    queryFn: () => apiGet<RoutineState[]>("/routines"),
+  });
   const weather = useWeather();
   const [apptOpen, setApptOpen] = useState(false);
   const [apptDraft, setApptDraft] = useState<AppointmentDraft | undefined>();
@@ -74,6 +79,10 @@ export default function Morning() {
         </Card>
 
         <div className="space-y-6 lg:col-span-5">
+          <RoutineCard
+            loading={routines.isLoading}
+            routine={routines.data?.find((r) => r.kind === "morning")}
+          />
           <Card>
             <CardHeader>
               <CardTitle className="font-heading">Habit intentions</CardTitle>

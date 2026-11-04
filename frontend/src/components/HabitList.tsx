@@ -1,9 +1,12 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { motion } from "motion/react";
 import { toast } from "sonner";
 import { Check } from "lucide-react";
-import { apiPost } from "@/lib/api";
-import type { HabitStats, HabitToggleOut } from "@/lib/types";
+import { apiGet, apiPost } from "@/lib/api";
+import type { AppSettings, HabitLog, HabitStats, HabitToggleOut } from "@/lib/types";
+import { fmtDist } from "@/lib/units";
+import { DistanceDialog } from "@/components/DistanceDialog";
 import { cn } from "@/lib/utils";
 
 export function useToggleHabit(date?: string) {
@@ -20,6 +23,45 @@ export function useToggleHabit(date?: string) {
   });
 }
 
+// Check off a distance habit with (or without) the distance run.
+export function useLogHabit() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { id: string; name: string; body: HabitLog }) =>
+      apiPost<HabitToggleOut>(`/habits/${v.id}/log`, v.body),
+    onSuccess: (_out, v) => {
+      qc.invalidateQueries({ queryKey: ["habits"] });
+      qc.invalidateQueries({ queryKey: ["range"] });
+      toast.success(`${v.name} — done`);
+    },
+    onError: () => toast.error("Could not log the run"),
+  });
+}
+
+// One click handler for every habit check button: distance habits that aren't
+// done yet ask "how far?" first; everything else toggles straight away.
+export function useHabitCheck() {
+  const toggle = useToggleHabit();
+  const log = useLogHabit();
+  const [asking, setAsking] = useState<HabitStats | null>(null);
+  const check = (h: HabitStats) => {
+    if (h.tracksDistance && !h.doneToday) setAsking(h);
+    else toggle.mutate({ id: h.id, name: h.name });
+  };
+  const dialog = (
+    <DistanceDialog
+      habit={asking}
+      pending={log.isPending}
+      onClose={() => setAsking(null)}
+      onSubmit={(distanceKm) => {
+        if (asking) log.mutate({ id: asking.id, name: asking.name, body: { distanceKm } });
+        setAsking(null);
+      }}
+    />
+  );
+  return { check, dialog, pending: toggle.isPending || log.isPending };
+}
+
 export function HabitList({
   habits,
   loading,
@@ -29,7 +71,9 @@ export function HabitList({
   loading?: boolean;
   emptyLabel?: string;
 }) {
-  const toggle = useToggleHabit();
+  const { check, dialog, pending } = useHabitCheck();
+  const settings = useQuery({ queryKey: ["settings"], queryFn: () => apiGet<AppSettings>("/settings") });
+  const unit = settings.data?.distanceUnit ?? "km";
 
   if (loading) return <div className="h-32 animate-pulse rounded-xl bg-muted" />;
   if (!habits?.length)
@@ -41,6 +85,7 @@ export function HabitList({
 
   return (
     <ul className="space-y-2">
+      {dialog}
       {habits.map((h) => {
         const pct =
           h.mode === "monthly"
@@ -55,9 +100,9 @@ export function HabitList({
             <motion.button
               whileTap={{ scale: 1.15 }}
               data-testid={`habit-check-${h.id}`}
-              disabled={toggle.isPending}
+              disabled={pending}
               aria-label={`Mark ${h.name} ${h.doneToday ? "not done" : "done"} today`}
-              onClick={() => toggle.mutate({ id: h.id, name: h.name })}
+              onClick={() => check(h)}
               className={cn(
                 "grid size-7 shrink-0 place-items-center rounded-full border-2 transition-colors",
                 h.doneToday
@@ -76,6 +121,11 @@ export function HabitList({
                   ? `🔥 ${h.streak} day${h.streak === 1 ? "" : "s"} · best ${h.bestStreak}`
                   : `${h.monthCount}/${h.monthlyTarget} this month`}
               </div>
+              {h.tracksDistance && (
+                <div className="font-mono text-xs text-primary" data-testid={`habit-distance-${h.id}`}>
+                  📏 {fmtDist(h.weekKm, unit)} this week · {fmtDist(h.monthKm, unit)} this month
+                </div>
+              )}
               {pct !== null && (
                 <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-muted">
                   <div

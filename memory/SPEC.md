@@ -64,9 +64,35 @@ tomorrow's preview). Public URL: https://daily-loop-8--68ipsq2d.preview.emergent
   the wake-up day), `DELETE /api/health/events` clears all imported data. Page shows the
   last 14 days grouped by day with kcal-eaten totals.
 
+- **Running distance** — habits with `tracksDistance` (Habit dialog checkbox; seed: "Morning
+  run"). Checking one off (not yet done) opens a "How far?" prompt → `POST /api/habits/{id}/log`
+  {distanceKm, date?} (upserts the completion; "Just mark done" = distanceKm null). Totals in
+  `GET /api/habits`: todayKm/weekKm (Mon→today)/monthKm/totalKm, always km on the wire. Per day,
+  a typed distance wins; otherwise Samsung Health exercise events whose title matches /run/i
+  with distanceKm (parser: `distance` column metres→km; numeric exercise_type codes mapped,
+  1002=Running) fill in — no double counting. Toggle-off deletes the completion + its km.
+  UI converts with `lib/units.ts` per `settings.distanceUnit` (km|mi, Settings page).
+- **Routines** (`/api/routines`) — exactly two: `morning` (default 07:00) and `bedtime` (22:00),
+  each with editable steps (ids preserved on edit so today's ticks survive), daily-reset checks in
+  `routine_checks` (kind+date, doneStepIds, complete), and a completion streak (days where every
+  step was ticked; reuses habits `_streaks`). `POST /routines/{kind}/steps/{stepId}/toggle`,
+  `PUT /routines/{kind}` {time?, notify?, steps?}. Cards: Today (both), /morning, /evening.
+- **Push notifications (Web Push/VAPID, pywebpush 2.5.0)** — `public/sw.js` shows pushes +
+  focuses/opens the app on tap. Settings → Routine notifications: enable (permission from a
+  click → subscribe → `POST /api/push/subscribe`; also saves the browser timezone to
+  settings.timezone and turns both routines' notify on), send test (`POST /api/push/test`), turn
+  off, per-routine toggles. Cron `.emergent/crons.yml` `routine-reminders` every 15 min →
+  `POST /api/cron/routines` (Bearer WEBHOOK_CRON_SECRET, constant-time compare, 401/400,
+  idempotent on X-Webhook-Id via `cron_runs` TTL 7d, acks 202 then background). Sends a
+  routine's push when its local time passed within the last 60 min, once per local day
+  (`lastNotifiedDate` claimed atomically), skipped if the routine is already complete. 404/410
+  subscriptions are deleted. Env: VAPID_PRIVATE_KEY, VAPID_PUBLIC_KEY, VAPID_SUBJECT,
+  WEBHOOK_CRON_SECRET (app-generated, in backend/.env). iOS needs the installed home-screen app.
+- Settings PUT is now **partial** (only sent fields change; explicit home:null clears).
+
 ## Health data model
 - `health_events`: eventId (unique), type (nutrition|exercise|sleep), date, start, end,
-  title, durationMin, calories, proteinG, carbsG, fatG, stage, score, sourceFile.
+  title, durationMin, distanceKm, calories, proteinG, carbsG, fatG, stage, score, sourceFile.
 
 ## Seed / demo data (`backend/seed.py`, idempotent, skips if habits exist)
 Home = New York; 4 habits (Read 20 pages 📚, Morning run 🏃 streaks; Meditate 🧘; Gym 🏋️

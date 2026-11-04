@@ -16,6 +16,7 @@ import type {
   Appointment,
   DayContext,
   HabitStats,
+  RoutineState,
   ShoppingItem,
 } from "@/lib/types";
 import { useWeather } from "@/lib/useWeather";
@@ -27,6 +28,7 @@ import { HabitList } from "@/components/HabitList";
 import { ReminderList } from "@/components/ReminderList";
 import { MealSlots } from "@/components/MealSlots";
 import { AppointmentDialog, type AppointmentDraft } from "@/components/AppointmentDialog";
+import { RoutineCard } from "@/components/RoutineCard";
 import { Button } from "@/components/ui/button";
 import { buttonVariants } from "@/components/ui/button";
 import {
@@ -48,6 +50,10 @@ export default function Home() {
   const shopping = useQuery({
     queryKey: ["shopping"],
     queryFn: () => apiGet<ShoppingItem[]>("/shopping"),
+  });
+  const routines = useQuery({
+    queryKey: ["routines"],
+    queryFn: () => apiGet<RoutineState[]>("/routines"),
   });
   const weather = useWeather();
   const qc = useQueryClient();
@@ -226,6 +232,17 @@ export default function Home() {
             </Link>
           </CardContent>
         </Card>
+
+        <RoutineCard
+          className="md:col-span-6"
+          loading={routines.isLoading}
+          routine={routines.data?.find((r) => r.kind === "morning")}
+        />
+        <RoutineCard
+          className="md:col-span-6"
+          loading={routines.isLoading}
+          routine={routines.data?.find((r) => r.kind === "bedtime")}
+        />
 
         <Card className="md:col-span-6">
           <CardHeader>

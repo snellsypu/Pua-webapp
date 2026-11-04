@@ -18,7 +18,7 @@ load_dotenv(ROOT_DIR / '.env')
 # MongoDB connection
 from lib.db import client, db, ensure_indexes
 from lib import weather as weather_lib
-from routers import appointments, habits, health, meals, overview, reminders, shopping
+from routers import appointments, habits, health, meals, overview, push, reminders, routines, shopping
 from routers import settings as settings_routes
 from routers import weather as weather_routes
 
@@ -78,6 +78,8 @@ api_router.include_router(reminders.router)
 api_router.include_router(settings_routes.router)
 api_router.include_router(weather_routes.router)
 api_router.include_router(health.router)
+api_router.include_router(routines.router)
+api_router.include_router(push.router)
 
 # Include the router in the main app
 app.include_router(api_router)
