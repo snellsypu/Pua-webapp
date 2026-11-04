@@ -137,6 +137,7 @@ export interface HabitStats {
   bestStreak: number;
   monthCount: number;
   tracksDistance: boolean;
+  duolingoUsername: string | null; // linked Duolingo profile — auto-ticks after practice
   // Always km on the wire; convert with lib/units for display.
   todayKm: number;
   weekKm: number;
@@ -495,11 +496,45 @@ export interface PremiumState {
   since: string | null;
   renewsOn: string | null;
   demo: boolean;
+  testMode: boolean; // Stripe test mode — test cards only
   prices: PremiumPrice[];
   freeBouquets: number;
+  freeGroupSize: number; // people per bouquet incl. owner, without Premium
 }
 export interface CheckoutIn {
   plan: PremiumPlan;
-  cardName: string;
-  cardLast4: string;
+  origin_url: string;
+}
+export interface CheckoutOut {
+  checkout_url: string;
+  session_id: string;
+}
+export interface PaymentStatus {
+  session_id: string;
+  status: string;
+  payment_status: string;
+}
+
+// Mirrors backend/routers/stats.py
+export interface RoutineLeis {
+  kind: "morning" | "bedtime";
+  title: string;
+  leis: number;
+  completeDays: number;
+  streak: number;
+  bestStreak: number;
+}
+export interface Stats {
+  memberSince: string;
+  daysUsing: number;
+  activeDays: number;
+  leisTotal: number;
+  routines: RoutineLeis[];
+  habitCheckOffs: number;
+  habits: number;
+  bestHabitStreak: number;
+  appointments: number;
+  remindersDone: number;
+  bouquets: number;
+  notesWritten: number;
 }

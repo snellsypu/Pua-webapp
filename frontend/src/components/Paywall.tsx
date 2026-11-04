@@ -1,11 +1,10 @@
-// Premium paywall — MOCKED checkout: the card form is a placeholder and nothing is charged.
-// Swap the POST /premium/checkout call for Stripe Checkout later.
+// Premium paywall — Stripe Checkout (test mode until the Stripe sandbox is claimed).
 import { createContext, useCallback, useContext, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { CreditCard, Loader2, Lock, Mic, Route, Sparkles, Users } from "lucide-react";
 import { apiGet, apiPost } from "@/lib/api";
-import type { CheckoutIn, PremiumPlan, PremiumState } from "@/lib/types";
+import type { CheckoutIn, CheckoutOut, PremiumPlan, PremiumState } from "@/lib/types";
 import { Flower, FlowerTick } from "@/components/Flower";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -21,7 +20,7 @@ export const usePaywall = () => useContext(PaywallCtx);
 
 const PERKS = [
   { icon: Mic, text: "AI voice — say it any way you like, works on iPhone" },
-  { icon: Users, text: "More than 2 bouquets to share with" },
+  { icon: Users, text: "Unlimited bouquets, with more than 6 people in each" },
   { icon: Route, text: "Travel mode per appointment & live-location commutes" },
 ];
 
@@ -29,19 +28,9 @@ function PaywallDialog({ open, onOpenChange, reason }: { open: boolean; onOpenCh
   const qc = useQueryClient();
   const premium = usePremium();
   const [plan, setPlan] = useState<PremiumPlan>("yearly");
-  const [card, setCard] = useState({ name: "", number: "", exp: "", cvc: "" });
-  const digits = card.number.replace(/\D/g, "");
-  const valid = card.name.trim() && digits.length >= 12 && /^\d{2}\s*\/\s*\d{2}$/.test(card.exp) && /^\d{3,4}$/.test(card.cvc);
   const buy = useMutation({
-    mutationFn: (body: CheckoutIn) => apiPost<PremiumState>("/premium/checkout", body),
-    onSuccess: (s) => {
-      qc.setQueryData(["premium"], s);
-      qc.invalidateQueries({ queryKey: ["settings"] });
-      qc.invalidateQueries({ queryKey: ["sharing"] });
-      toast.success("Welcome to PUA Premium 🌺");
-      setCard({ name: "", number: "", exp: "", cvc: "" });
-      onOpenChange(false);
-    },
+    mutationFn: (body: CheckoutIn) => apiPost<CheckoutOut>("/premium/checkout", body),
+    onSuccess: (r) => { window.location.href = r.checkout_url; },
     onError: () => toast.error("Checkout didn't go through — try again"),
   });
 
@@ -75,40 +64,16 @@ function PaywallDialog({ open, onOpenChange, reason }: { open: boolean; onOpenCh
             </button>
           ))}
         </div>
-        <p className="flex items-start gap-2 rounded-xl border border-amber-500/40 bg-amber-400/10 p-2.5 text-xs" data-testid="paywall-demo-note">
-          <Lock className="mt-0.5 size-3.5 shrink-0" /> Demo checkout — payments aren&apos;t connected yet, so no card is charged. Use any test details.
-        </p>
-        <form className="grid gap-2.5" onSubmit={(e) => {
-          e.preventDefault();
-          if (valid) buy.mutate({ plan, cardName: card.name.trim(), cardLast4: digits.slice(-4) });
-        }}>
-          <div className="grid gap-1.5">
-            <Label htmlFor="pay-name">Name on card</Label>
-            <Input id="pay-name" value={card.name} onChange={(e) => setCard({ ...card, name: e.target.value })} autoComplete="cc-name" data-testid="paywall-card-name" />
-          </div>
-          <div className="grid gap-1.5">
-            <Label htmlFor="pay-number">Card number</Label>
-            <div className="relative">
-              <CreditCard className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-              <Input id="pay-number" inputMode="numeric" className="pl-8 font-mono" placeholder="4242 4242 4242 4242" value={card.number} maxLength={23}
-                onChange={(e) => setCard({ ...card, number: e.target.value.replace(/[^\d ]/g, "") })} data-testid="paywall-card-number" />
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            <div className="grid gap-1.5">
-              <Label htmlFor="pay-exp">Expiry</Label>
-              <Input id="pay-exp" placeholder="MM/YY" maxLength={7} value={card.exp} onChange={(e) => setCard({ ...card, exp: e.target.value })} data-testid="paywall-card-exp" />
-            </div>
-            <div className="grid gap-1.5">
-              <Label htmlFor="pay-cvc">CVC</Label>
-              <Input id="pay-cvc" inputMode="numeric" maxLength={4} value={card.cvc} onChange={(e) => setCard({ ...card, cvc: e.target.value.replace(/\D/g, "") })} data-testid="paywall-card-cvc" />
-            </div>
-          </div>
-          <Button type="submit" size="lg" className="mt-1" disabled={!valid || buy.isPending} data-testid="paywall-subscribe">
-            {buy.isPending ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
-            Start Premium · {premium.data?.prices.find((p) => p.plan === plan)?.label ?? ""}
-          </Button>
-        </form>
+        {premium.data?.testMode && (
+          <p className="flex items-start gap-2 rounded-xl border border-amber-500/40 bg-amber-400/10 p-2.5 text-xs" data-testid="paywall-test-note">
+            <Lock className="mt-0.5 size-3.5 shrink-0" /> Stripe test mode — use card 4242 4242 4242 4242, any future date and any CVC. No real money moves yet.
+          </p>
+        )}
+        <Button size="lg" disabled={buy.isPending || !premium.data} onClick={() => buy.mutate({ plan, origin_url: window.location.origin })} data-testid="paywall-subscribe">
+          {buy.isPending ? <Loader2 className="size-4 animate-spin" /> : <CreditCard className="size-4" />}
+          Continue to secure checkout · {premium.data?.prices.find((p) => p.plan === plan)?.label ?? ""}
+        </Button>
+        <p className="text-center text-[11px] text-muted-foreground">Payments by Stripe · cancel any time in Settings</p>
       </DialogContent>
     </Dialog>
   );

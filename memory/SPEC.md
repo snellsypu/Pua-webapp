@@ -304,14 +304,30 @@ Emergent-managed Google sign-in (lib/auth.py, routers/auth.py, frontend lib/auth
   "Full lei!"); morning = plumeria/pink plumeria/ʻilima, bedtime = hibiscus/lehua/pink.
   Nav item "Bouquets" (route /sharing).
 
-## Premium (MOCKED paywall — no payment provider yet)
-- routers/premium.py: GET /api/premium → {active, plan, since, renewsOn, demo, prices
-  (£2.99/month, £24.99/year), freeBouquets 2}; POST /premium/checkout {plan, cardName,
-  cardLast4} turns `settings.premiumVoice` on (MOCK — nothing charged); POST /premium/cancel.
-  PUT /settings with premiumVoice:true → 402 (only checkout can enable it).
-- Frontend: Paywall.tsx (PaywallProvider in AppShell, `usePaywall()(reason)`), demo card form
-  with a "Demo checkout" notice. Opened from Settings → Premium tick, the bouquet limit and
-  paused-bouquet "Unlock". Replace the checkout call with Stripe later.
+## Premium (Stripe subscriptions — claimable sandbox, TEST MODE)
+- setup_stripe.py (idempotent): product "PUA Premium" (txcd_10103001), prices by lookup_key
+  pua_premium_monthly £2.99/month, pua_premium_yearly £24.99/year. Keys in backend/.env
+  (STRIPE_SECRET_KEY/PUBLISHABLE/ACCOUNT_ID/WEBHOOK_SECRET/MODE). Tax: Stripe-managed
+  (managed_payments, falls back to automatic_tax).
+- routers/premium.py: GET /api/premium (state, prices, freeBouquets 1, freeGroupSize 6);
+  POST /premium/checkout {plan, origin_url} → {checkout_url, session_id} (subscription mode,
+  `payment_transactions` row inserted first); GET /premium/status/{session_id} (own sessions,
+  polls Stripe, activates idempotently); POST /premium/cancel (cancels the Stripe
+  subscription); POST /api/stripe/webhook (public, signature-verified: session completed →
+  activate, subscription deleted → Premium off). PUT /settings premiumVoice:true → 402.
+- Frontend: Paywall.tsx → Stripe-hosted checkout; /payment/success polls, /payment/cancel.
+- Free limits: 1 bouquet (later ones paused), max 6 people per bouquet incl. owner (join →
+  403 "full"); Premium removes both.
+
+## Stats (/stats, routers/stats.py GET /api/stats)
+memberSince/daysUsing (from users.created_at), activeDays, leisTotal + per-routine leis
+(every 7th consecutive complete day in any run counts one lei), completeDays, best streaks,
+habit check-offs, best habit streak, appointments, reminders done, bouquets, notes written.
+
+## Duolingo link (lib/duolingo.py — unofficial public profile endpoint)
+Habit.duolingoUsername (set in HabitDialog; PUT /habits/{id} validates the profile → 404
+unknown, 502 unreachable; "" unlinks). The 5-min cron checks each linked habit ≤ every 30 min;
+when the profile's currentStreak.endDate == local today it ticks the habit (source duolingo).
 
 ## Lei milestones
 - LeiCelebration.tsx (mounted in AppShell): `celebrateIfLeiComplete(prev, next)` fires when a

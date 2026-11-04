@@ -30,7 +30,7 @@ export function VoiceSettingsCard() {
       qc.setQueryData(["premium"], p);
       qc.invalidateQueries({ queryKey: ["settings"] });
       qc.invalidateQueries({ queryKey: ["sharing"] });
-      toast.success("Premium cancelled — bouquets past your first 2 are paused");
+      toast.success("Premium cancelled — bouquets past your first one are paused");
     },
     onError: () => toast.error("Could not cancel Premium"),
   });
@@ -86,7 +86,7 @@ export function VoiceSettingsCard() {
             </span>
             <span className="text-xs font-medium text-primary" data-testid="settings-premium-status">
               {premium.data?.active
-                ? `${premium.data.plan === "yearly" ? "Yearly" : "Monthly"} plan · renews ${premium.data.renewsOn ?? ""} (demo — nothing is charged). Untick to cancel.`
+                ? `${premium.data.plan === "yearly" ? "Yearly" : "Monthly"} plan · renews ${premium.data.renewsOn ?? ""} · untick to cancel.`
                 : "Tick to see plans — from £2.99 / month."}
             </span>
           </span>

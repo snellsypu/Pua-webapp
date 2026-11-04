@@ -23,6 +23,7 @@ from routers import auth as auth_routes
 from routers import sharing as sharing_routes
 from routers import notes as notes_routes
 from routers import premium as premium_routes
+from routers import stats as stats_routes
 from routers import appointments, commute, runplan, habits, health, meals, overview, push, reminders, routines, shopping, voice
 from routers import settings as settings_routes
 from routers import weather as weather_routes
@@ -79,6 +80,7 @@ api_router.include_router(auth_routes.router)
 api_router.include_router(sharing_routes.router)
 api_router.include_router(notes_routes.router)
 api_router.include_router(premium_routes.router)
+api_router.include_router(stats_routes.router)
 api_router.include_router(overview.router)
 api_router.include_router(appointments.router)
 api_router.include_router(habits.router)

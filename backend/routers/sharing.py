@@ -172,6 +172,12 @@ async def join(input: JoinIn, request: Request):
         raise HTTPException(status_code=400, detail="That's one of your own bouquets")
     if b["id"] in await paused_ids(b["ownerId"]):
         raise HTTPException(status_code=403, detail="That bouquet is paused right now — ask its owner")
+    from routers.premium import FREE_GROUP_SIZE, is_premium
+
+    already = await raw_db.bouquet_members.find_one({"bouquetId": b["id"], "viewerId": uid})
+    if not already and not await is_premium(b["ownerId"]):
+        if await raw_db.bouquet_members.count_documents({"bouquetId": b["id"]}) >= FREE_GROUP_SIZE - 1:
+            raise HTTPException(status_code=403, detail=f"That bouquet is full ({FREE_GROUP_SIZE} people) — its owner can go Premium for more")
     await raw_db.bouquet_members.update_one(
         {"bouquetId": b["id"], "viewerId": uid},
         {"$setOnInsert": {"ownerId": b["ownerId"], "joinedAt": datetime.now(timezone.utc)}}, upsert=True,

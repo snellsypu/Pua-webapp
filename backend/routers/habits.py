@@ -1,5 +1,6 @@
 """Habits with two tracking modes: daily streaks and monthly counters."""
 
+import uuid
 from datetime import datetime, timedelta
 
 from pymongo import ASCENDING
@@ -127,6 +128,7 @@ async def list_habits():
                 bestStreak=best,
                 monthCount=sum(1 for d in dates if d.startswith(month_prefix)),
                 tracksDistance=bool(h.get("tracksDistance", False)),
+                duolingoUsername=h.get("duolingoUsername") or None,
                 **totals,
             )
         )
@@ -146,6 +148,28 @@ async def update_habit(id: str, input: HabitUpdate):
     if not updates:
         raise HTTPException(status_code=422, detail="Nothing to update")
     from pymongo import ReturnDocument
+
+    if "duolingoUsername" in updates:
+        name = (updates["duolingoUsername"] or "").strip().lstrip("@")
+        if name:
+            from lib.duolingo import fetch_profile
+
+            try:
+                prof = await fetch_profile(name)
+            except Exception:
+                raise HTTPException(status_code=502, detail="Couldn't reach Duolingo — try again shortly")
+            if not prof:
+                raise HTTPException(status_code=404, detail="No Duolingo profile with that username")
+            updates["duolingoUsername"] = prof["username"]
+            updates["duolingoCheckedAt"] = None  # check on the next cron run
+            if prof["practisedOn"] == today_iso():
+                await db.habit_completions.update_one(
+                    {"habitId": id, "date": today_iso()},
+                    {"$setOnInsert": {"id": str(uuid.uuid4()), "habitId": id, "date": today_iso(), "source": "duolingo"}},
+                    upsert=True,
+                )
+        else:
+            updates["duolingoUsername"] = None
 
     doc = await db.habits.find_one_and_update(
         {"id": id}, {"$set": updates}, return_document=ReturnDocument.AFTER

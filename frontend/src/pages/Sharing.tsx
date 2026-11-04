@@ -66,6 +66,7 @@ function BouquetCard({ b }: { b: Bouquet }) {
   const tid = `bouquet-${b.id}`;
   const [qr, setQr] = useState(false);
   const openPaywall = usePaywall();
+  const premium = usePremium();
   const invite = async () => {
     const url = inviteLink(b.code);
     const text = `Join my ${b.name} bouquet on PUA`;
@@ -95,7 +96,7 @@ function BouquetCard({ b }: { b: Bouquet }) {
                   onClick={() => { setName(b.name); setEditing(true); }} data-testid={`${tid}-rename`}><Pencil className="size-3.5" /></button>
               </CardTitle>
             )}
-            <CardDescription>{b.members.length} {b.members.length === 1 ? "person" : "people"} · {b.categories.length ? `${b.categories.length} shared` : "nothing shared yet"}</CardDescription>
+            <CardDescription>{premium.data?.active ? `${b.members.length} ${b.members.length === 1 ? "person" : "people"}` : `${b.members.length + 1}/${premium.data?.freeGroupSize ?? 6} people incl. you`} · {b.categories.length ? `${b.categories.length} shared` : "nothing shared yet"}</CardDescription>
           </div>
           <div className="flex items-center gap-1.5">
             <span className="select-all rounded-xl border bg-muted/40 px-3 py-1.5 font-mono text-base font-bold tracking-[0.2em]" data-testid={`${tid}-code`}>{fmtCode(b.code)}</span>
@@ -109,7 +110,7 @@ function BouquetCard({ b }: { b: Bouquet }) {
         {b.paused && (
           <div className="mx-4 flex flex-wrap items-center gap-3 rounded-2xl border border-amber-500/40 bg-amber-400/10 px-3 py-2.5 text-sm" data-testid={`${tid}-paused`}>
             <Pause className="size-4 shrink-0 text-amber-700 dark:text-amber-300" />
-            <span className="min-w-0 flex-1">Paused — without Premium only your first 2 bouquets work. Its people can&apos;t see anything until you upgrade.</span>
+            <span className="min-w-0 flex-1">Paused — without Premium only your first bouquet works. Its people can&apos;t see anything until you upgrade.</span>
             <Button size="sm" onClick={() => openPaywall("More than 2 bouquets")} data-testid={`${tid}-unlock`}><Sparkles className="size-4" /> Unlock</Button>
           </div>
         )}
@@ -227,7 +228,7 @@ export default function Sharing() {
         </form>
         {atLimit && (
           <p className="w-full text-right text-xs text-muted-foreground" data-testid="bouquet-limit-note">
-            Free plan: 2 bouquets. <button type="button" className="font-medium text-primary underline" onClick={() => openPaywall("More than 2 bouquets")} data-testid="bouquet-limit-upgrade">Go Premium</button> for more.
+            Free plan: 1 bouquet of up to 6 people. <button type="button" className="font-medium text-primary underline" onClick={() => openPaywall("More than 2 bouquets")} data-testid="bouquet-limit-upgrade">Go Premium</button> for more.
           </p>
         )}
       </header>

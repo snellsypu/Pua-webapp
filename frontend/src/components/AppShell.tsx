@@ -12,6 +12,7 @@ import {
   Settings as SettingsIcon,
   Sunrise,
   Flower2,
+  BarChart3,
   SunMedium,
   UtensilsCrossed,
 } from "lucide-react";
@@ -35,6 +36,7 @@ const NAV = [
   { to: "/planner", label: "Planner", icon: UtensilsCrossed, testid: "nav-planner" },
   { to: "/health", label: "Health", icon: HeartPulse, testid: "nav-health" },
   { to: "/sharing", label: "Bouquets", icon: Flower2, testid: "nav-sharing" },
+  { to: "/stats", label: "Stats", icon: BarChart3, testid: "nav-stats" },
 ];
 
 export default function AppShell() {

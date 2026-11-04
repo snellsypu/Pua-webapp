@@ -11,6 +11,8 @@ import NotFound from "@/pages/NotFound";
 import Sharing from "@/pages/Sharing";
 import SharedPlannerPage from "@/pages/SharedPlanner";
 import JoinBouquet from "@/pages/JoinBouquet";
+import StatsPage from "@/pages/Stats";
+import { PaymentCancel, PaymentSuccess } from "@/pages/Payment";
 import { AuthGate } from "@/lib/auth";
 
 // One <Route> per page in src/pages; BrowserRouter already wraps this in main.tsx.
@@ -32,6 +34,9 @@ export default function App() {
         <Route path="/sharing" element={<Sharing />} />
         <Route path="/shared/:ownerId" element={<SharedPlannerPage />} />
         <Route path="/join/:code" element={<JoinBouquet />} />
+        <Route path="/stats" element={<StatsPage />} />
+        <Route path="/payment/success" element={<PaymentSuccess />} />
+        <Route path="/payment/cancel" element={<PaymentCancel />} />
         <Route path="*" element={<NotFound />} />
       </Route>
     </Routes>

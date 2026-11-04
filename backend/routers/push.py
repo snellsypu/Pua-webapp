@@ -174,6 +174,12 @@ async def _run_for_owner() -> None:
         await _run_reminder(settings, now_local)
     except Exception:
         logger.exception("run reminder failed")
+    try:
+        from lib.duolingo import sync_duolingo
+
+        await sync_duolingo(local_date)
+    except Exception:
+        logger.exception("duolingo sync failed")
     for doc in await ensure_routines():
         if not doc.get("notify") or doc.get("lastNotifiedDate") == local_date:
             continue

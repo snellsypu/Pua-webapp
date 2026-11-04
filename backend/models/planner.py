@@ -282,6 +282,7 @@ class Habit(BaseModel):
     mode: str = "streak"  # streak | monthly
     monthlyTarget: int = 12  # only used by monthly mode
     tracksDistance: bool = False  # running habit: log km per check-off + Samsung runs
+    duolingoUsername: str | None = None  # linked Duolingo profile — auto-ticks after practice
     createdAt: datetime = Field(default_factory=_now)
 
 
@@ -306,6 +307,7 @@ class HabitCreate(BaseModel):
 
 
 class HabitUpdate(BaseModel):
+    duolingoUsername: str | None = Field(default=None, max_length=60)  # "" unlinks
     name: str | None = None
     emoji: str | None = None
     mode: str | None = None
@@ -336,6 +338,7 @@ class HabitStats(BaseModel):
     bestStreak: int
     monthCount: int
     tracksDistance: bool = False
+    duolingoUsername: str | None = None  # linked Duolingo profile
     # Distance totals (always stored in km; the UI converts to the user's unit).
     # Per day: the distance typed at check-off wins; otherwise Samsung Health runs.
     todayKm: float = 0
