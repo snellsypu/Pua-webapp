@@ -1,4 +1,6 @@
 import { useEffect, useRef } from "react";
+import { PaywallProvider } from "@/components/Paywall";
+import { LeiCelebration } from "@/components/LeiCelebration";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { MotionConfig } from "motion/react";
@@ -62,6 +64,7 @@ export default function AppShell() {
   }, [daypart.data, settings.data, location.search, navigate]);
 
   return (
+    <PaywallProvider>
     <MotionConfig reducedMotion="user">
       <div className="min-h-svh">
         <header className="sticky top-0 z-40 border-b bg-background/80 backdrop-blur-md">
@@ -131,6 +134,8 @@ export default function AppShell() {
       <VoiceAssistant />
       {/* Lifted above the FAB so toasts never cover the create button */}
       <Toaster richColors offset={{ bottom: 96, right: 24 }} mobileOffset={{ bottom: 92 }} />
+      <LeiCelebration />
     </MotionConfig>
+    </PaywallProvider>
   );
 }

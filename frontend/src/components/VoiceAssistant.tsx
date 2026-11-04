@@ -3,13 +3,14 @@
 // aloud → say "yes" to save or "go back" to try again (buttons do the same).
 // Also: shopping-list items, check-offs ("I ran 5k") and a spoken day briefing.
 import { useCallback, useEffect, useRef, useState } from "react";
+import { celebrateIfLeiComplete } from "@/components/LeiCelebration";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "motion/react";
 import { toast } from "sonner";
 import { CalendarPlus, Bell, CheckCircle2, ListChecks, Loader2, MapPin, Mic, MicOff, RotateCcw, ShoppingCart, Sparkles, Square, Volume2, X } from "lucide-react";
 import { apiGet, apiPost, apiPut, apiUpload, ApiError } from "@/lib/api";
 import { shortName } from "@/components/AppointmentDialog";
-import type { AppSettings, Appointment, DistanceUnit, GeoPlace, VoiceDraft, VoiceParseIn, VoiceParseOut, VoiceTranscript } from "@/lib/types";
+import type { AppSettings, Appointment, DistanceUnit, GeoPlace, RoutineState, VoiceDraft, VoiceParseIn, VoiceParseOut, VoiceTranscript } from "@/lib/types";
 import {
   browserSpeechSupported,
   listenOnce,
@@ -131,7 +132,11 @@ export function VoiceAssistant() {
         return null;
       }
       if (d.kind === "checkoff") {
-        if (d.targetType === "routine") return apiPost(`/routines/${d.routineKind}/steps/${d.targetId}/toggle`, {});
+        if (d.targetType === "routine") {
+          const next = await apiPost<RoutineState>(`/routines/${d.routineKind}/steps/${d.targetId}/toggle`, {});
+          celebrateIfLeiComplete(qc.getQueryData<RoutineState[]>(["routines"])?.find((x) => x.kind === next.kind), next);
+          return next;
+        }
         if (d.distanceKm != null) return apiPost(`/habits/${d.targetId}/log`, { distanceKm: d.distanceKm });
         return apiPost(`/habits/${d.targetId}/toggle`, {});
       }

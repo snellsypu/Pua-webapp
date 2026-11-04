@@ -1,4 +1,5 @@
-import { Lock, MapPin, Pencil, Trash2 } from "lucide-react";
+import { Lock, MapPin, MessageCircle, Pencil, Trash2 } from "lucide-react";
+import { useNoteCounts } from "@/components/BouquetNotes";
 import { Button } from "@/components/ui/button";
 import type { Appointment } from "@/lib/types";
 
@@ -13,6 +14,7 @@ export function DayAgenda({
   onDelete?: (a: Appointment) => void;
   emptyLabel?: string;
 }) {
+  const counts = useNoteCounts();
   if (!appointments.length) {
     return (
       <p className="text-sm text-muted-foreground" data-testid="agenda-empty">
@@ -36,6 +38,12 @@ export function DayAgenda({
             <div className="flex items-center gap-1.5 truncate text-sm font-medium">
               {a.private && <Lock className="size-3 shrink-0 text-muted-foreground" aria-label="Private" data-testid={`appointment-private-${a.id}`} />}
               <span className="truncate">{a.title}</span>
+              {!!counts.data?.[a.id] && (
+                <span className="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-rose-500/15 px-1.5 text-[10px] font-medium text-rose-700 dark:text-rose-300"
+                  title="Bouquet notes" data-testid={`appointment-notes-count-${a.id}`}>
+                  <MessageCircle className="size-3" /> {counts.data[a.id]}
+                </span>
+              )}
             </div>
             {a.location && (
               <div className="flex items-center gap-1 text-xs text-muted-foreground">

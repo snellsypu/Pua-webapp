@@ -1,6 +1,7 @@
 // Hands-free routine: PUA reads each open step, listens for "done" (ticks it),
 // "skip", "repeat" or "stop", and moves on until the routine is finished.
 import { useEffect, useRef, useState } from "react";
+import { celebrateIfLeiComplete } from "@/components/LeiCelebration";
 import { useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "motion/react";
 import { toast } from "sonner";
@@ -87,6 +88,7 @@ export function HandsFreeRoutine({ kind, autoStart = false, size = "xs" }: {
         if (verdict === "skip") skipped.add(step.id);
         if (verdict === "done") {
           const next = await apiPost<RoutineState>(`/routines/${kind}/steps/${step.id}/toggle`);
+          celebrateIfLeiComplete(qc.getQueryData<RoutineState[]>(["routines"])?.find((x) => x.kind === next.kind), next);
           qc.setQueryData<RoutineState[]>(["routines"], (old) => old?.map((x) => (x.kind === next.kind ? next : x)));
           if (next.complete) toast.success(`${next.title} complete 🎉`);
         }

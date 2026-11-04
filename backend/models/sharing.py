@@ -3,6 +3,7 @@
 from pydantic import BaseModel
 
 from models.auth import Person
+from models.notes import AppointmentNote, BouquetRef
 from models.planner import Appointment, HabitStats, Meal, Reminder, ShoppingItem
 from models.routines import RoutineState
 
@@ -18,6 +19,8 @@ class SharedPlanner(BaseModel):
     routines: list[RoutineState] | None = None
     meals: list[Meal] | None = None  # this week
     shopping: list[ShoppingItem] | None = None
+    notes: list[AppointmentNote] = []  # bouquet notes you can see on these appointments
+    noteBouquets: list[BouquetRef] = []  # your bouquets of theirs you can post notes in
 
 
 class FriendCalendar(BaseModel):

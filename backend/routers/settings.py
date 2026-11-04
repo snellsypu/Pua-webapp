@@ -3,7 +3,7 @@
 import os
 from datetime import datetime, timezone
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 
 from lib.db import db
 from models.planner import AppSettings, SettingsUpdate
@@ -58,6 +58,9 @@ async def update_settings(input: SettingsUpdate):
     # Partial update: only fields the client sent change, so saving one setting
     # can never reset another. An explicit "home": null clears the home city.
     updates = input.model_dump(exclude_unset=True)
+    if updates.get("premiumVoice") and not (await _get_or_create()).get("premiumVoice"):
+        # MOCKED paywall: Premium is switched on only through POST /api/premium/checkout
+        raise HTTPException(status_code=402, detail="Premium needs a subscription")
     for k in ("home", "homeAddress"):
         if updates.get(k) is not None:
             updates[k] = getattr(input, k).model_dump()

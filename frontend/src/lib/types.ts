@@ -402,6 +402,7 @@ export interface Bouquet {
   categories: ShareCategory[];
   shoppingEdit: boolean;
   members: Person[];
+  paused: boolean; // past the 2 free bouquets without Premium
 }
 
 export interface SharingState {
@@ -433,6 +434,8 @@ export interface SharedPlanner {
   routines: RoutineState[] | null;
   meals: Meal[] | null;
   shopping: ShoppingItem[] | null;
+  notes: AppointmentNote[]; // bouquet notes you can see
+  noteBouquets: BouquetRef[]; // their bouquets you can post notes in
 }
 
 // Mirrors FriendCalendar in backend/models/sharing.py — calendar overlay
@@ -448,4 +451,55 @@ export type StarterPack = "fitness" | "mindful" | "home" | "morning" | "bedtime"
 export interface OnboardIn {
   sample: boolean;
   packs?: StarterPack[];
+}
+
+// Mirrors backend/models/notes.py — bouquet notes on shared appointments
+export interface BouquetRef {
+  id: string;
+  name: string;
+}
+export interface AppointmentNote {
+  id: string;
+  appointmentId: string;
+  bouquetId: string;
+  bouquetName: string;
+  authorId: string;
+  authorName: string;
+  authorPicture: string;
+  text: string;
+  createdAt: string;
+  mine: boolean;
+  canDelete: boolean;
+}
+export interface NoteIn {
+  text: string;
+  bouquetId: string;
+}
+export interface MyAppointmentNotes {
+  notes: AppointmentNote[];
+  bouquets: BouquetRef[];
+  private: boolean;
+}
+
+// Mirrors backend/models/premium.py — MOCKED checkout (no payment taken yet)
+export type PremiumPlan = "monthly" | "yearly";
+export interface PremiumPrice {
+  plan: PremiumPlan;
+  label: string;
+  amount: number;
+  currency: string;
+}
+export interface PremiumState {
+  active: boolean;
+  plan: PremiumPlan | null;
+  since: string | null;
+  renewsOn: string | null;
+  demo: boolean;
+  prices: PremiumPrice[];
+  freeBouquets: number;
+}
+export interface CheckoutIn {
+  plan: PremiumPlan;
+  cardName: string;
+  cardLast4: string;
 }

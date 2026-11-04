@@ -250,6 +250,17 @@ Emergent-managed Google sign-in (lib/auth.py, routers/auth.py, frontend lib/auth
   DELETE /joined/{ownerId} (leave all their bouquets); GET /planner/{ownerId} snapshot (404
   without membership): appointments/reminders today+13 d, habits, routines, meals this week,
   shopping — only shared categories (others null).
+- **Premium limit**: without Premium only a user's first 2 bouquets (by createdAt) work —
+  POST /bouquets 402 at the limit; later ones get `paused: true` (excluded from access, join →
+  403) until Premium is back. **Bouquet notes** (routers/notes.py, `appointment_notes`
+  {id, ownerId, appointmentId, bouquetId, bouquetName, authorId, authorName, text}): a note
+  lives in one bouquet; only its members + the owner see it. Viewers: POST
+  /sharing/planner/{owner}/appointments/{id}/notes {text, bouquetId} (must be in that active
+  bouquet sharing appointments; private appt → 403); snapshot carries `notes` +
+  `noteBouquets`. Owner: GET/POST /sharing/my-notes/{apptId}, GET /sharing/note-counts (badge
+  in DayAgenda); DELETE /sharing/notes/{id} (author or owner). UI: SharedPlanner thread per
+  appointment; AppointmentDialog "Bouquet notes". **QR**: Bouquet card QR button → dialog with
+  qrcode.react QRCodeSVG of the invite link (plumeria in the middle).
 - **Invite links**: `/join/ABCD-2345` (Bouquet card "Invite link" → share sheet or copy).
   Signed out → SignIn shows an invite note; Google redirect returns to the same path; new
   accounts onboard first; then JoinBouquet page POSTs /sharing/join (response carries
@@ -292,3 +303,18 @@ Emergent-managed Google sign-in (lib/auth.py, routers/auth.py, frontend lib/auth
   routine's current streak, strung along a garland in rounds of 7 slots (max 28 shown, then
   "Full lei!"); morning = plumeria/pink plumeria/ʻilima, bedtime = hibiscus/lehua/pink.
   Nav item "Bouquets" (route /sharing).
+
+## Premium (MOCKED paywall — no payment provider yet)
+- routers/premium.py: GET /api/premium → {active, plan, since, renewsOn, demo, prices
+  (£2.99/month, £24.99/year), freeBouquets 2}; POST /premium/checkout {plan, cardName,
+  cardLast4} turns `settings.premiumVoice` on (MOCK — nothing charged); POST /premium/cancel.
+  PUT /settings with premiumVoice:true → 402 (only checkout can enable it).
+- Frontend: Paywall.tsx (PaywallProvider in AppShell, `usePaywall()(reason)`), demo card form
+  with a "Demo checkout" notice. Opened from Settings → Premium tick, the bouquet limit and
+  paused-bouquet "Unlock". Replace the checkout call with Stripe later.
+
+## Lei milestones
+- LeiCelebration.tsx (mounted in AppShell): `celebrateIfLeiComplete(prev, next)` fires when a
+  routine completes and its streak hits a multiple of 7 → falling flowers + card + spoken
+  "Your lei is complete!" (if spoken replies are on). Called from RoutineCard, hands-free and
+  voice check-offs.

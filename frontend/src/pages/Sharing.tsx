@@ -2,11 +2,14 @@
 // choice of what's shared (view-only, plus optional shopping edits). Joining another
 // bouquet never removes you from the first.
 import { useState } from "react";
+import { QRCodeSVG } from "qrcode.react";
+import { usePaywall, usePremium } from "@/components/Paywall";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "motion/react";
 import { toast } from "sonner";
-import { Copy, Eye, Link2, LogOut, Pencil, Plus, RefreshCw, Trash2, UserMinus, UserPlus } from "lucide-react";
+import { Copy, Eye, Link2, LogOut, Pause, Pencil, Plus, QrCode, RefreshCw, Sparkles, Trash2, UserMinus, UserPlus } from "lucide-react";
 import { apiDelete, apiGet, apiPost, apiPut, ApiError } from "@/lib/api";
 import type { Bouquet, BouquetUpdate, ShareCategory, SharingState } from "@/lib/types";
 import { Avatar } from "@/components/AccountButton";
@@ -61,6 +64,8 @@ function BouquetCard({ b }: { b: Bouquet }) {
     catch { toast.error("Couldn't copy — select the code and copy it"); }
   };
   const tid = `bouquet-${b.id}`;
+  const [qr, setQr] = useState(false);
+  const openPaywall = usePaywall();
   const invite = async () => {
     const url = inviteLink(b.code);
     const text = `Join my ${b.name} bouquet on PUA`;
@@ -95,11 +100,19 @@ function BouquetCard({ b }: { b: Bouquet }) {
           <div className="flex items-center gap-1.5">
             <span className="select-all rounded-xl border bg-muted/40 px-3 py-1.5 font-mono text-base font-bold tracking-[0.2em]" data-testid={`${tid}-code`}>{fmtCode(b.code)}</span>
             <Button size="sm" onClick={() => void invite()} data-testid={`${tid}-invite`} title={inviteLink(b.code)}><Link2 className="size-4" /> Invite link</Button>
+            <Button size="icon-sm" variant="outline" aria-label="Show QR code" onClick={() => setQr(true)} data-testid={`${tid}-qr`}><QrCode className="size-4" /></Button>
             <Button size="icon-sm" variant="outline" aria-label="Copy code" onClick={() => void copy()} data-testid={`${tid}-copy`}><Copy className="size-4" /></Button>
             <Button size="icon-sm" variant="outline" aria-label="New code" title="New code — members stay" onClick={() => regen.mutate(undefined)} disabled={regen.isPending}
               data-testid={`${tid}-regenerate`}><RefreshCw className="size-4" /></Button>
           </div>
         </CardHeader>
+        {b.paused && (
+          <div className="mx-4 flex flex-wrap items-center gap-3 rounded-2xl border border-amber-500/40 bg-amber-400/10 px-3 py-2.5 text-sm" data-testid={`${tid}-paused`}>
+            <Pause className="size-4 shrink-0 text-amber-700 dark:text-amber-300" />
+            <span className="min-w-0 flex-1">Paused — without Premium only your first 2 bouquets work. Its people can&apos;t see anything until you upgrade.</span>
+            <Button size="sm" onClick={() => openPaywall("More than 2 bouquets")} data-testid={`${tid}-unlock`}><Sparkles className="size-4" /> Unlock</Button>
+          </div>
+        )}
         <CardContent className="grid gap-5 md:grid-cols-5">
           <div className="space-y-2 md:col-span-3">
             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">What this bouquet sees</p>
@@ -157,25 +170,44 @@ function BouquetCard({ b }: { b: Bouquet }) {
           </div>
         </CardContent>
       </Card>
+      <Dialog open={qr} onOpenChange={setQr}>
+        <DialogContent className="sm:max-w-sm" data-testid={`${tid}-qr-dialog`}>
+          <DialogHeader>
+            <DialogTitle className="font-heading">Scan to join {b.name}</DialogTitle>
+            <DialogDescription>Point a phone camera at the code — it opens PUA and joins this bouquet.</DialogDescription>
+          </DialogHeader>
+          <div className="mx-auto rounded-3xl border bg-white p-4 shadow-sm">
+            <QRCodeSVG value={inviteLink(b.code)} size={232} level="H" fgColor="#0b4f49" marginSize={0} data-testid={`${tid}-qr-code`}
+              imageSettings={{ src: "/favicon.svg", height: 46, width: 46, excavate: true }} />
+          </div>
+          <p className="text-center font-mono text-lg font-bold tracking-[0.2em]">{fmtCode(b.code)}</p>
+          <Button variant="outline" onClick={() => void invite()} data-testid={`${tid}-qr-share`}><Link2 className="size-4" /> Share the link instead</Button>
+        </DialogContent>
+      </Dialog>
     </motion.div>
   );
 }
 
 export default function Sharing() {
   const state = useQuery({ queryKey: ["sharing"], queryFn: () => apiGet<SharingState>("/sharing") });
+  const s = state.data;
+  const qc = useQueryClient();
   const { wrap } = useSharingMutations();
   const [newName, setNewName] = useState("");
   const [code, setCode] = useState("");
+  const openPaywall = usePaywall();
+  const premium = usePremium();
   const create = useMutation({
     ...wrap((n: string) => apiPost<SharingState>("/sharing/bouquets", { name: n }), (n) => `${n} bouquet made — share its code`),
-    onSettled: () => setNewName(""),
+    onError: (e: unknown) => (e instanceof ApiError && e.status === 402 ? openPaywall("More than 2 bouquets") : toast.error(errText(e))),
+    onSuccess: (s: SharingState, n: string) => { qc.setQueryData(["sharing"], s); setNewName(""); toast.success(`${n} bouquet made — share its code`); },
   });
+  const atLimit = !!s && !premium.data?.active && s.bouquets.length >= (premium.data?.freeBouquets ?? 2);
   const join = useMutation({
     ...wrap((c: string) => apiPost<SharingState>("/sharing/join", { code: c }), () => "Joined! Their planner is below"),
     onSettled: () => setCode(""),
   });
   const leave = useMutation(wrap((id: string) => apiDelete<SharingState>(`/sharing/joined/${id}`), () => "Left that planner"));
-  const s = state.data;
 
   return (
     <div className="mx-auto max-w-4xl space-y-6" data-testid="sharing-page">
@@ -189,8 +221,15 @@ export default function Sharing() {
         </div>
         <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); if (newName.trim()) create.mutate(newName.trim()); }}>
           <Input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="New bouquet, e.g. Family" maxLength={40} className="w-56" data-testid="bouquet-new-input" />
-          <Button type="submit" disabled={!newName.trim() || create.isPending} data-testid="bouquet-new-button"><Plus className="size-4" /> Make</Button>
+          <Button type="submit" disabled={!newName.trim() || create.isPending} data-testid="bouquet-new-button">
+            {atLimit ? <Sparkles className="size-4" /> : <Plus className="size-4" />} Make
+          </Button>
         </form>
+        {atLimit && (
+          <p className="w-full text-right text-xs text-muted-foreground" data-testid="bouquet-limit-note">
+            Free plan: 2 bouquets. <button type="button" className="font-medium text-primary underline" onClick={() => openPaywall("More than 2 bouquets")} data-testid="bouquet-limit-upgrade">Go Premium</button> for more.
+          </p>
+        )}
       </header>
 
       <div className="space-y-4" data-testid="bouquets-list">

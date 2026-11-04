@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { OwnerAppointmentNotes } from "@/components/BouquetNotes";
 import { Flower } from "@/components/Flower";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -294,6 +295,7 @@ export function AppointmentDialog({
               <span className={`absolute top-0.5 size-4 rounded-full bg-background shadow transition-transform duration-150 ${isPrivate ? "translate-x-4" : "translate-x-0.5"}`} />
             </span>
           </button>
+          {isEdit && !isPrivate && <OwnerAppointmentNotes appointmentId={initial!.id!} />}
           <div className="grid gap-1.5">
             <Label htmlFor="appt-notes">Notes</Label>
             <Textarea

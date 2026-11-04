@@ -1,5 +1,6 @@
 // View-only snapshot of a friend's planner — only the parts they chose to share.
 import { useState } from "react";
+import { SharedAppointmentNotes } from "@/components/BouquetNotes";
 import { FlowerTick, flowerFor } from "@/components/Flower";
 import { Link, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -82,7 +83,11 @@ export default function SharedPlannerPage() {
                   <span className="w-24 shrink-0 font-mono text-xs text-muted-foreground">{a.date === p.today ? "Today" : fmtShort(a.date)}<br />{a.startTime}{a.endTime ? `–${a.endTime}` : ""}</span>
                   <span className="min-w-0"><span className={cn("flex items-center gap-1.5 font-medium", a.private && "text-muted-foreground")}>
                     {a.private && <Lock className="size-3.5" />}{a.title}</span>
-                    {a.location && <span className="flex items-center gap-1 text-xs text-muted-foreground"><MapPin className="size-3" /> {a.location}</span>}</span>
+                    {a.location && <span className="flex items-center gap-1 text-xs text-muted-foreground"><MapPin className="size-3" /> {a.location}</span>}
+                    {!a.private && p.noteBouquets.length + p.notes.filter((n) => n.appointmentId === a.id).length > 0 && (
+                      <SharedAppointmentNotes ownerId={ownerId} appointmentId={a.id} bouquets={p.noteBouquets}
+                        notes={p.notes.filter((n) => n.appointmentId === a.id)} />
+                    )}</span>
                 </li>
               ))}
             </ul>

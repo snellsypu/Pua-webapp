@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { celebrateIfLeiComplete } from "@/components/LeiCelebration";
 import { FlowerTick } from "@/components/Flower";
 import { Lei } from "@/components/Lei";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -39,6 +40,7 @@ export function RoutineCard({
     mutationFn: (stepId: string) =>
       apiPost<RoutineState>(`/routines/${routine!.kind}/steps/${stepId}/toggle`),
     onSuccess: (r) => {
+      celebrateIfLeiComplete(qc.getQueryData<RoutineState[]>(["routines"])?.find((x) => x.kind === r.kind), r);
       qc.setQueryData<RoutineState[]>(["routines"], (old) =>
         old?.map((x) => (x.kind === r.kind ? r : x)),
       );

@@ -1,9 +1,10 @@
 import { useState } from "react";
+import { usePaywall, usePremium } from "@/components/Paywall";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Mic, Sparkles } from "lucide-react";
-import { apiGet, apiPut } from "@/lib/api";
-import type { AppSettings } from "@/lib/types";
+import { apiGet, apiPost } from "@/lib/api";
+import type { AppSettings, PremiumState } from "@/lib/types";
 import { browserSpeechSupported, SPEAK_KEY, speak, speechOutputSupported } from "@/lib/speech";
 import { WAKE_EVENT, WAKE_KEY } from "@/components/VoiceAssistant";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -21,14 +22,19 @@ export function VoiceSettingsCard() {
     if (on) void speak("Spoken replies are on.");
   };
 
-  const setPremium = useMutation({
-    mutationFn: (premiumVoice: boolean) => apiPut<AppSettings>("/settings", { premiumVoice }),
-    onSuccess: (s) => {
-      qc.setQueryData(["settings"], s);
-      toast.success(s.premiumVoice ? "Premium voice on" : "Premium voice off");
+  const openPaywall = usePaywall();
+  const premium = usePremium();
+  const cancelPremium = useMutation({
+    mutationFn: () => apiPost<PremiumState>("/premium/cancel"),
+    onSuccess: (p) => {
+      qc.setQueryData(["premium"], p);
+      qc.invalidateQueries({ queryKey: ["settings"] });
+      qc.invalidateQueries({ queryKey: ["sharing"] });
+      toast.success("Premium cancelled — bouquets past your first 2 are paused");
     },
-    onError: () => toast.error("Could not change Premium voice"),
+    onError: () => toast.error("Could not cancel Premium"),
   });
+  const setPremium = { isPending: cancelPremium.isPending, mutate: (on: boolean) => (on ? openPaywall("AI voice") : cancelPremium.mutate()) };
 
   const toggleWake = async (on: boolean) => {
     if (on) {
@@ -77,6 +83,11 @@ export function VoiceSettingsCard() {
               say it any way you like — plus a travel mode per appointment and live-location
               commutes. Voice uses your Emergent AI credits, a small amount per command.
               Off: free mode using your browser&apos;s speech recognition and set phrases.
+            </span>
+            <span className="text-xs font-medium text-primary" data-testid="settings-premium-status">
+              {premium.data?.active
+                ? `${premium.data.plan === "yearly" ? "Yearly" : "Monthly"} plan · renews ${premium.data.renewsOn ?? ""} (demo — nothing is charged). Untick to cancel.`
+                : "Tick to see plans — from £2.99 / month."}
             </span>
           </span>
         </label>

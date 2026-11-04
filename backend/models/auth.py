@@ -52,6 +52,7 @@ class Bouquet(BaseModel):
     categories: list[ShareCategory]
     shoppingEdit: bool = True  # members may tick off / add shopping items (if shopping shared)
     members: list[Person]
+    paused: bool = False  # past the 2 free bouquets without Premium: members can't see it
 
 
 class SharingState(BaseModel):

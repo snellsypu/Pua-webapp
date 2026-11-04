@@ -136,6 +136,10 @@ INDEXES: dict[str, list[IndexModel]] = {
         IndexModel([("bouquetId", ASCENDING), ("viewerId", ASCENDING)], name="bouquet_viewer", unique=True),
         IndexModel([("viewerId", ASCENDING), ("ownerId", ASCENDING)], name="viewer_owner"),
     ],
+    "appointment_notes": [
+        IndexModel([("ownerId", ASCENDING), ("appointmentId", ASCENDING), ("createdAt", ASCENDING)], name="owner_appt_created"),
+        IndexModel([("id", ASCENDING)], name="id", unique=True),
+    ],
     "cron_runs": [
         IndexModel([("runId", ASCENDING)], name="run_id", unique=True),
         IndexModel([("at", ASCENDING)], name="at_ttl", expireAfterSeconds=7 * 24 * 3600),

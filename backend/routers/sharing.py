@@ -27,6 +27,16 @@ router = APIRouter(prefix="/sharing", tags=["sharing"])
 MAX_BOUQUETS = 12
 
 
+async def paused_ids(owner_id: str) -> set[str]:
+    """Without Premium only the owner's first FREE_BOUQUETS bouquets work; the rest pause."""
+    from routers.premium import FREE_BOUQUETS, is_premium
+
+    if await is_premium(owner_id):
+        return set()
+    ids = [b["id"] async for b in raw_db.bouquets.find({"ownerId": owner_id}, {"id": 1}).sort("createdAt", 1)]
+    return set(ids[FREE_BOUQUETS:])
+
+
 def _person(u: dict) -> Person:
     return Person(user_id=u["user_id"], name=u.get("name", ""), email=u["email"], picture=u.get("picture", ""))
 
@@ -46,7 +56,8 @@ async def _access(owner_id: str, viewer_id: str) -> tuple[set[str], bool, list[d
     """(categories, shoppingEdit, bouquets in joined order) the viewer has on owner's planner."""
     ids = [m["bouquetId"] async for m in
            raw_db.bouquet_members.find({"ownerId": owner_id, "viewerId": viewer_id}).sort("joinedAt", 1)]
-    by_id = {b["id"]: b async for b in raw_db.bouquets.find({"id": {"$in": ids}})}
+    paused = await paused_ids(owner_id)
+    by_id = {b["id"]: b async for b in raw_db.bouquets.find({"id": {"$in": ids}}) if b["id"] not in paused}
     bouquets = [by_id[i] for i in ids if i in by_id]
     cats: set[str] = set()
     edit = False
@@ -63,11 +74,12 @@ async def _colors(viewer_id: str) -> dict[str, str]:
 
 async def _state(uid: str) -> SharingState:
     bouquets: list[Bouquet] = []
+    paused = await paused_ids(uid)
     async for b in raw_db.bouquets.find({"ownerId": uid}).sort("createdAt", 1):
         member_ids = [m["viewerId"] async for m in raw_db.bouquet_members.find({"bouquetId": b["id"]})]
         members = [_person(u) async for u in raw_db.users.find({"user_id": {"$in": member_ids}}, {"_id": 0})]
         bouquets.append(Bouquet(id=b["id"], name=b["name"], code=b["code"], categories=b.get("categories", []),
-                                shoppingEdit=b.get("shoppingEdit", True), members=members))
+                                shoppingEdit=b.get("shoppingEdit", True), members=members, paused=b["id"] in paused))
     owner_ids = list(dict.fromkeys([m["ownerId"] async for m in raw_db.bouquet_members.find({"viewerId": uid})]))
     joined: list[JoinedPlanner] = []
     colors = await _colors(uid)
@@ -93,8 +105,13 @@ async def get_sharing(request: Request):
 
 @router.post("/bouquets", response_model=SharingState, status_code=201)
 async def create_bouquet(input: BouquetCreate, request: Request):
+    from routers.premium import FREE_BOUQUETS, is_premium
+
     uid = _uid(request)
-    if await raw_db.bouquets.count_documents({"ownerId": uid}) >= MAX_BOUQUETS:
+    count = await raw_db.bouquets.count_documents({"ownerId": uid})
+    if count >= FREE_BOUQUETS and not await is_premium(uid):
+        raise HTTPException(status_code=402, detail=f"Premium lets you make more than {FREE_BOUQUETS} bouquets")
+    if count >= MAX_BOUQUETS:
         raise HTTPException(status_code=400, detail=f"You can have up to {MAX_BOUQUETS} bouquets")
     await raw_db.bouquets.insert_one({
         "id": str(uuid.uuid4()), "ownerId": uid, "name": input.name.strip(), "code": await _unique_code(),
@@ -153,6 +170,8 @@ async def join(input: JoinIn, request: Request):
         raise HTTPException(status_code=404, detail="No bouquet has that code")
     if b["ownerId"] == uid:
         raise HTTPException(status_code=400, detail="That's one of your own bouquets")
+    if b["id"] in await paused_ids(b["ownerId"]):
+        raise HTTPException(status_code=403, detail="That bouquet is paused right now — ask its owner")
     await raw_db.bouquet_members.update_one(
         {"bouquetId": b["id"], "viewerId": uid},
         {"$setOnInsert": {"ownerId": b["ownerId"], "joinedAt": datetime.now(timezone.utc)}}, upsert=True,
@@ -203,8 +222,10 @@ async def _owner_for(owner_id: str, viewer_id: str) -> tuple[dict, set[str], boo
 @router.get("/planner/{owner_id}", response_model=SharedPlanner)
 async def shared_planner(owner_id: str, request: Request):
     """Read-only snapshot of a friend's planner — only what their bouquets share with you."""
-    owner, cats, edit = await _owner_for(owner_id, _uid(request))
+    uid = _uid(request)
+    owner, cats, edit = await _owner_for(owner_id, uid)
     from routers import appointments, habits, meals, reminders, routines, shopping
+    from routers.notes import viewer_notes
 
     today = today_iso()
     until = (date.fromisoformat(today) + timedelta(days=13)).isoformat()
@@ -222,6 +243,8 @@ async def shared_planner(owner_id: str, request: Request):
         )
     finally:
         current_owner.reset(token)
+    if out.appointments:
+        out.notes, out.noteBouquets = await viewer_notes(owner_id, uid, [a.id for a in out.appointments if not a.private])
     return out
 
 
