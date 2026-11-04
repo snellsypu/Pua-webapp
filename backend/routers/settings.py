@@ -40,6 +40,7 @@ def _out(doc: dict) -> AppSettings:
         homeAddress=doc.get("homeAddress"),
         travelMode=doc.get("travelMode", "car"),
         liveLocation=bool(doc.get("liveLocation", False)),
+        leaveAlerts=bool(doc.get("leaveAlerts", False)),
     )
 
 

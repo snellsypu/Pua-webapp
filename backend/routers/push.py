@@ -83,6 +83,42 @@ async def _maybe_wake(settings: dict, now_local: datetime, local_date: str) -> N
     logger.info("wake push: %s", result.model_dump())
 
 
+async def _leave_alerts(settings: dict, now_local: datetime) -> None:
+    """'Time to leave' push ~5 min before each appointment's leave-by time (commute from the
+    home address; rain-aware). One alert per appointment per day (appointments.leaveAlertDate)."""
+    if not settings.get("leaveAlerts") or not settings.get("homeAddress"):
+        return
+    from lib.briefing import plan_commute, spoken_time
+    from lib.travel import MODE_WORDS, _minus
+
+    today = today_iso()
+    now = now_local.strftime("%H:%M")
+    horizon = (now_local + timedelta(hours=4)).strftime("%H:%M") if now_local.hour < 20 else "23:59"
+    appts = await db.appointments.find({
+        "date": today, "startTime": {"$gt": now, "$lte": horizon},
+        "location": {"$nin": ["", None]}, "leaveAlertDate": {"$ne": today},
+    }).sort("startTime", 1).to_list(20)
+    for a in appts:
+        plan = await plan_commute(settings, a, None)
+        if not isinstance(plan, dict):
+            continue
+        leave_by = plan["rain"]["leaveBy"] if plan["rain"] else plan["leaveBy"]
+        earliest = min(plan["leaveBy"], leave_by)
+        if now < _minus(earliest, 5):
+            continue
+        claimed = await db.appointments.update_one(
+            {"id": a["id"], "leaveAlertDate": {"$ne": today}}, {"$set": {"leaveAlertDate": today}}
+        )
+        if not claimed.modified_count:
+            continue
+        body = (f"{a['title']} at {spoken_time(a['startTime'])} — about {plan['minutes']} min "
+                f"{MODE_WORDS[plan['mode']]}, leave by {spoken_time(plan['leaveBy'])}.")
+        if plan["rain"]:
+            body += f" Heavy rain likely — driving is ~{plan['rain']['minutes']} min."
+        result = await push_lib.send_to_all("Time to leave 🚶", body, url="/overview?view=today", tag=f"leave-{a['id']}")
+        logger.info("leave alert %s: %s", a["id"], result.model_dump())
+
+
 async def run_routine_notifications() -> None:
     settings = await db.settings.find_one({"id": "app"}) or {}
     try:
@@ -92,6 +128,10 @@ async def run_routine_notifications() -> None:
     now_local = datetime.now(tz)
     local_date = now_local.strftime("%Y-%m-%d")
     await _maybe_wake(settings, now_local, local_date)
+    try:
+        await _leave_alerts(settings, now_local)
+    except Exception:
+        logger.exception("leave alerts failed")
     for doc in await ensure_routines():
         if not doc.get("notify") or doc.get("lastNotifiedDate") == local_date:
             continue

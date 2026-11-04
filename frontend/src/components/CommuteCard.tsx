@@ -29,6 +29,7 @@ export function CommuteCard() {
       qc.invalidateQueries({ queryKey: ["readout"] });
       if ("homeAddress" in u) toast.success(next.homeAddress ? "Home address saved" : "Home address removed");
       else if (u.travelMode) toast.success(`Default: ${TRAVEL_LABELS[next.travelMode].toLowerCase()}`);
+      else if (u.leaveAlerts !== undefined) toast.success(next.leaveAlerts ? "Leave-now alerts on" : "Leave-now alerts off");
       else toast.success(next.liveLocation ? "Commute from your live location" : "Commute from home");
     },
     onError: () => toast.error("Could not save"),
@@ -124,9 +125,23 @@ export function CommuteCard() {
           </Select>
           <p className="text-xs text-muted-foreground">
             Typical journey times without live traffic. Public transport isn&apos;t available yet.
+            Walking or cycling into heavy rain? PUA suggests driving instead.
             {premium ? " You can also pick a mode per appointment." : " Premium lets you pick a mode per appointment."}
           </p>
         </div>
+
+        <label htmlFor="leave-alerts" className="flex items-start gap-2.5 rounded-xl border p-3">
+          <Checkbox id="leave-alerts" checked={s?.leaveAlerts ?? false} disabled={save.isPending || !s?.homeAddress}
+            onCheckedChange={(c) => save.mutate({ leaveAlerts: c === true })} data-testid="settings-leave-alerts" />
+          <span className="grid gap-0.5">
+            <span className="text-sm font-medium">Leave-now alerts</span>
+            <span className="text-xs text-muted-foreground">
+              {s?.homeAddress
+                ? "A notification about 5 minutes before you need to set off for each appointment with a place (travel time from home, with a drive suggestion if heavy rain is on the way). Needs notifications on for this device."
+                : "Add your home address first."}
+            </span>
+          </span>
+        </label>
 
         <label htmlFor="live-location" className="flex items-start gap-2.5 rounded-xl border p-3">
           <Checkbox id="live-location" checked={premium && (s?.liveLocation ?? false)} disabled={!premium || save.isPending}

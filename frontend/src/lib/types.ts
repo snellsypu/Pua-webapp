@@ -26,6 +26,7 @@ export interface AppSettings {
   homeAddress: Location | null; // commute start point
   travelMode: TravelMode;
   liveLocation: boolean; // Premium: commute from the phone's location
+  leaveAlerts: boolean; // "time to leave" pushes before appointments
 }
 
 // Mirrors DayPart in backend/models/planner.py
@@ -52,6 +53,7 @@ export interface SettingsUpdate {
   homeAddress?: Location | null;
   travelMode?: TravelMode;
   liveLocation?: boolean;
+  leaveAlerts?: boolean;
 }
 
 export interface Appointment {
@@ -63,6 +65,8 @@ export interface Appointment {
   location: string;
   notes: string;
   travelMode: TravelMode | null; // Premium per-appointment mode; null = default
+  locationLat: number | null; // set when picked from address search
+  locationLon: number | null;
 }
 
 export interface AppointmentCreate {
@@ -73,6 +77,8 @@ export interface AppointmentCreate {
   location?: string;
   notes?: string;
   travelMode?: TravelMode | null;
+  locationLat?: number | null;
+  locationLon?: number | null;
 }
 
 export type HabitMode = "streak" | "monthly";

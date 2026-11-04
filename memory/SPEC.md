@@ -87,6 +87,18 @@ tomorrow's preview). Public URL: https://daily-loop-8--68ipsq2d.preview.emergent
   ignored server-side without Premium) and `settings.liveLocation` (wake read-out sends the
   phone's lat/lon → `/voice/wake?lat&lon`). OSM attribution shown on banner + settings card.
   Seeded locations ("Office", "Dr. Lee, Maple St") are not geocodable — real addresses are.
+- **Address picking** (AppointmentDialog): Location field + "Find" (explicit submit / Enter —
+  Nominatim forbids autocomplete) → `GET /api/address/search` → pick a result → location text =
+  first 3 parts of the name and `Appointment.locationLat/locationLon` saved; a pin icon shows it.
+  Typing again clears the coords (sent as null). `travel.commute` uses the coords when present.
+- **Rain-aware travel** (`briefing.plan_commute` / `rain_likely`): when the mode is foot/bike and
+  heavy rain is likely (that hour's precip ≥ 60 % if within the 8-hour hourly window, else the
+  day's ≥ 70 % with a heavy-rain code 63/65/66/67/81/82/95/96/99, at the home city), the
+  read-outs add "you might drive instead: about N minutes, leave by …".
+- **Leave-now alerts** (`settings.leaveAlerts`, needs `homeAddress`; Settings → Commute times):
+  the 5-min cron (`push._leave_alerts`) checks today's appointments with a location starting in
+  the next 4 h and pushes "Time to leave" ~5 min before the leave-by time (from home; rain
+  advice included), once per appointment per day (`appointments.leaveAlertDate`).
 - **Hands-free routine** (components/HandsFreeRoutine.tsx): "Hands-free" button on routine cards
   (when not complete) and on the read-out banners. Speaks each open step, listens (browser
   recognition) for done/next → toggles the step; skip; repeat; stop. Ends with the streak.

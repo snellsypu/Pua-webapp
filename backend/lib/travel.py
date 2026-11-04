@@ -111,10 +111,13 @@ async def commute(appt: dict, origin: tuple[float, float], mode: str) -> dict | 
     if not place:
         return None
     try:
-        found = await search(place, near=origin, limit=1)
-        if not found:
-            return None
-        dest = (found[0]["latitude"], found[0]["longitude"])
+        if appt.get("locationLat") is not None and appt.get("locationLon") is not None:
+            dest = (appt["locationLat"], appt["locationLon"])  # picked from address search
+        else:
+            found = await search(place, near=origin, limit=1)
+            if not found:
+                return None
+            dest = (found[0]["latitude"], found[0]["longitude"])
         minutes = await route_minutes(mode, origin, dest)
     except Exception:
         logger.warning("commute lookup failed for %r", place, exc_info=True)

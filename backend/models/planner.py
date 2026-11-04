@@ -73,6 +73,7 @@ class AppSettings(BaseModel):
     homeAddress: Location | None = None  # street address — start point for commute times
     travelMode: str = "car"  # default for commute times: car | foot | bike
     liveLocation: bool = False  # Premium: commute from where the phone is, not home
+    leaveAlerts: bool = False  # push "time to leave" before appointments (needs homeAddress)
 
 
 class DayPart(BaseModel):
@@ -101,6 +102,7 @@ class SettingsUpdate(BaseModel):
     homeAddress: Location | None = None  # explicit null clears
     travelMode: str | None = None
     liveLocation: bool | None = None
+    leaveAlerts: bool | None = None
 
     @field_validator("reviewTime", "wakeTime", "weekendWakeTime")
     @classmethod
@@ -152,6 +154,9 @@ class Appointment(BaseModel):
     location: str = ""
     notes: str = ""
     travelMode: str | None = None  # Premium: per-appointment commute mode (None = default)
+    # Picked from address search — exact destination, no geocoding needed (None = free text)
+    locationLat: float | None = Field(default=None, ge=-90, le=90)
+    locationLon: float | None = Field(default=None, ge=-180, le=180)
     createdAt: datetime = Field(default_factory=_now)
 
     @field_validator("date")
@@ -173,6 +178,8 @@ class AppointmentCreate(BaseModel):
     location: str = ""
     notes: str = ""
     travelMode: str | None = None
+    locationLat: float | None = Field(default=None, ge=-90, le=90)
+    locationLon: float | None = Field(default=None, ge=-180, le=180)
 
     @field_validator("travelMode")
     @classmethod
@@ -198,6 +205,8 @@ class AppointmentUpdate(BaseModel):
     location: str | None = None
     notes: str | None = None
     travelMode: str | None = None  # explicit null = back to the default mode
+    locationLat: float | None = Field(default=None, ge=-90, le=90)  # explicit null = free text
+    locationLon: float | None = Field(default=None, ge=-180, le=180)
 
     @field_validator("travelMode")
     @classmethod

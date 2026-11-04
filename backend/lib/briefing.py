@@ -88,8 +88,34 @@ def _mode(settings: dict, appt: dict) -> str:
     return settings.get("travelMode") if settings.get("travelMode") in travel.ROUTERS else "car"
 
 
-async def commute_sentence(settings: dict, appt: dict, live: tuple[float, float] | None, now_hhmm: str | None) -> str:
-    """'It's about 18 minutes by car from home — leave by 1:32 PM.' (or a hint / '')."""
+HEAVY_RAIN_CODES = {63, 65, 66, 67, 81, 82, 95, 96, 99}
+
+
+async def rain_likely(settings: dict, date_iso: str, hhmm: str) -> bool:
+    """Heavy rain around an appointment: the hourly forecast for that hour when it's in the
+    next-8-hours window (≥ 60 % chance), else the day forecast (≥ 70 % and heavy-rain code)."""
+    home = settings.get("home")
+    if not home:
+        return False
+    try:
+        wb = await weather_lib.get_bundle(home["latitude"], home["longitude"], settings.get("units", "celsius"))
+    except Exception:
+        return False
+    if date_iso == today_iso():
+        hour = next((h for h in wb.hourly if h.time[:2] == hhmm[:2]), None)
+        if hour:
+            return hour.precipProb >= 60
+    day = next((d for d in wb.days if d.date == date_iso), None)
+    return bool(day and day.precipProb >= 70 and day.code in HEAVY_RAIN_CODES)
+
+
+def _dur(m: int) -> str:
+    return _plural(m, "minute") if m < 60 else _plural(m // 60, "hour") + (f" {_plural(m % 60, 'minute')}" if m % 60 else "")
+
+
+async def plan_commute(settings: dict, appt: dict, live: tuple[float, float] | None) -> dict | str:
+    """→ {minutes, leaveBy, mode, fromWords, rain: {minutes, leaveBy} | None}, or a hint string
+    ('' when the appointment has no location). Rain: walking/cycling + heavy rain → the drive."""
     if not (appt.get("location") or "").strip():
         return ""
     origin, from_words = _origin(settings, live)
@@ -98,10 +124,27 @@ async def commute_sentence(settings: dict, appt: dict, live: tuple[float, float]
     c = await travel.commute(appt, origin, _mode(settings, appt))
     if not c:
         return f"I couldn't find {appt['location']} on the map for a travel time."
-    leave = "leave now" if now_hhmm and c["leaveBy"] <= now_hhmm else f"leave by {spoken_time(c['leaveBy'])}"
-    m = c["minutes"]
-    dur = _plural(m, "minute") if m < 60 else _plural(m // 60, "hour") + (f" {_plural(m % 60, 'minute')}" if m % 60 else "")
-    return f"It's about {dur} {travel.MODE_WORDS[c['mode']]} {from_words} — {leave}."
+    c["fromWords"] = from_words
+    c["rain"] = None
+    if c["mode"] in ("foot", "bike") and await rain_likely(settings, appt["date"], appt["startTime"]):
+        car = await travel.commute(appt, origin, "car")
+        if car:
+            c["rain"] = {"minutes": car["minutes"], "leaveBy": car["leaveBy"]}
+    return c
+
+
+async def commute_sentence(settings: dict, appt: dict, live: tuple[float, float] | None, now_hhmm: str | None) -> str:
+    """'It's about 18 minutes by car from home — leave by 1:32 PM.' (+ rain advice, or a hint / '')."""
+    c = await plan_commute(settings, appt, live)
+    if isinstance(c, str):
+        return c
+    def leave(hhmm: str) -> str:
+        return "leave now" if now_hhmm and hhmm <= now_hhmm else f"leave by {spoken_time(hhmm)}"
+    line = f"It's about {_dur(c['minutes'])} {travel.MODE_WORDS[c['mode']]} {c['fromWords']} — {leave(c['leaveBy'])}."
+    if c["rain"]:
+        line += (f" Heavy rain is likely then, so you might drive instead: about {_dur(c['rain']['minutes'])},"
+                 f" {leave(c['rain']['leaveBy'])}.")
+    return line
 
 
 def _appt_phrase(a: dict) -> str:
