@@ -1,21 +1,26 @@
 // PUA voice assistant: mic button (left of the + button) and "hey PUA" wake word.
-// Flow: listen → understand (free phrases, or Premium AI) → editable preview →
-// say "yes" to save or "go back" to try again (buttons do the same).
+// Flow: listen → understand (free phrases, or Premium AI) → editable preview, read
+// aloud → say "yes" to save or "go back" to try again (buttons do the same).
+// Also: shopping-list items, check-offs ("I ran 5k") and a spoken day briefing.
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "motion/react";
 import { toast } from "sonner";
-import { CalendarPlus, Bell, ListChecks, Loader2, Mic, MicOff, RotateCcw, Sparkles } from "lucide-react";
+import { CalendarPlus, Bell, CheckCircle2, ListChecks, Loader2, Mic, MicOff, RotateCcw, ShoppingCart, Sparkles, Square, Volume2, X } from "lucide-react";
 import { apiGet, apiPost, apiUpload, ApiError } from "@/lib/api";
-import type { AppSettings, VoiceDraft, VoiceParseIn, VoiceParseOut, VoiceTranscript } from "@/lib/types";
+import type { AppSettings, DistanceUnit, VoiceDraft, VoiceParseIn, VoiceParseOut, VoiceTranscript } from "@/lib/types";
 import {
   browserSpeechSupported,
   listenOnce,
   matchConfirm,
   recordClip,
   recorderSupported,
+  speak,
+  speakEnabled,
   startWakeListener,
+  stopSpeaking,
 } from "@/lib/speech";
+import { fromKm, toKm } from "@/lib/units";
 import { fmtShort } from "@/lib/dates";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -25,7 +30,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 
-type Phase = "idle" | "listening" | "thinking" | "preview" | "saving";
+type Phase = "idle" | "listening" | "thinking" | "preview" | "saving" | "briefing";
 export const WAKE_KEY = "pua:wake";
 export const WAKE_EVENT = "pua:wake-changed";
 
@@ -33,7 +38,35 @@ const KIND_META = {
   appointment: { label: "Appointment", icon: CalendarPlus },
   reminder: { label: "Reminder", icon: Bell },
   habit: { label: "Habit", icon: ListChecks },
+  shopping: { label: "Shopping list", icon: ShoppingCart },
+  checkoff: { label: "Check off", icon: CheckCircle2 },
 } as const;
+
+const isDated = (d: VoiceDraft) => d.kind === "appointment" || d.kind === "reminder";
+const spokenTime = (t: string | null) => {
+  if (!t) return "";
+  const [h, m] = t.split(":").map(Number);
+  const h12 = h % 12 || 12;
+  return `${h12}${m ? `:${String(m).padStart(2, "0")}` : ""} ${h < 12 ? "AM" : "PM"}`;
+};
+const listJoin = (xs: string[]) => (xs.length < 2 ? xs.join("") : `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}`);
+
+/** What PUA reads aloud for a preview. */
+export function describeDraft(d: VoiceDraft, unit: DistanceUnit): string {
+  const day = d.date ? fmtShort(d.date) : "";
+  switch (d.kind) {
+    case "appointment":
+      return `Appointment: ${d.title}, ${day} at ${spokenTime(d.startTime)}${d.location ? `, at ${d.location}` : ""}.`;
+    case "reminder":
+      return `Reminder: ${d.title}, ${day} at ${spokenTime(d.time)}.`;
+    case "habit":
+      return `New habit: ${d.title}, ${d.habitMode === "monthly" ? `${d.monthlyTarget} times a month` : "daily streak"}.`;
+    case "shopping":
+      return `Add ${listJoin(d.items)} to your shopping list.`;
+    case "checkoff":
+      return `Tick off ${d.title}${d.distanceKm != null ? `, ${Number(fromKm(d.distanceKm, unit).toFixed(1))} ${unit === "mi" ? "miles" : "kilometres"}` : ""}.`;
+  }
+}
 
 const errText = (e: unknown) =>
   e instanceof ApiError && e.body && typeof e.body === "object" && "detail" in e.body
@@ -46,6 +79,7 @@ export function VoiceAssistant() {
   const qc = useQueryClient();
   const settings = useQuery({ queryKey: ["settings"], queryFn: () => apiGet<AppSettings>("/settings") });
   const premium = settings.data?.premiumVoice ?? false;
+  const unit: DistanceUnit = settings.data?.distanceUnit ?? "km";
 
   const [open, setOpen] = useState(false);
   const [phase, setPhase] = useState<Phase>("idle");
@@ -55,6 +89,8 @@ export function VoiceAssistant() {
   const [message, setMessage] = useState<string | null>(null);
   const [draft, setDraft] = useState<VoiceDraft | null>(null);
   const [usedAi, setUsedAi] = useState(false);
+  const [briefing, setBriefing] = useState<string | null>(null);
+  const [speaking, setSpeaking] = useState(false);
   const [wake, setWake] = useState(() => localStorage.getItem(WAKE_KEY) === "1");
 
   const abortRef = useRef<AbortController | null>(null);
@@ -84,15 +120,31 @@ export function VoiceAssistant() {
         });
       if (d.kind === "reminder")
         return apiPost("/reminders", { title: d.title, date: d.date, time: d.time ?? "09:00" });
+      if (d.kind === "shopping") {
+        for (const name of d.items.map((i) => i.trim()).filter(Boolean)) await apiPost("/shopping", { name });
+        return null;
+      }
+      if (d.kind === "checkoff") {
+        if (d.targetType === "routine") return apiPost(`/routines/${d.routineKind}/steps/${d.targetId}/toggle`, {});
+        if (d.distanceKm != null) return apiPost(`/habits/${d.targetId}/log`, { distanceKm: d.distanceKm });
+        return apiPost(`/habits/${d.targetId}/toggle`, {});
+      }
       return apiPost("/habits", {
         name: d.title, emoji: d.emoji, mode: d.habitMode,
         monthlyTarget: d.monthlyTarget, tracksDistance: d.tracksDistance,
       });
     },
     onSuccess: (_r, d) => {
-      for (const k of ["overview", "range", "habits"]) qc.invalidateQueries({ queryKey: [k] });
-      toast.success(`${KIND_META[d.kind].label} added — ${d.title}`);
+      for (const k of ["overview", "range", "habits", "shopping", "routines"]) qc.invalidateQueries({ queryKey: [k] });
+      const msg =
+        d.kind === "shopping"
+          ? `Added ${d.items.length} to the shopping list`
+          : d.kind === "checkoff"
+            ? `Ticked off — ${d.title}`
+            : `${KIND_META[d.kind].label} added — ${d.title}`;
+      toast.success(msg);
       close();
+      if (speakEnabled()) void speak(d.kind === "checkoff" ? "Done. Nice work!" : "Saved.");
     },
     onError: (e) => {
       setPhase("preview");
@@ -130,12 +182,21 @@ export function VoiceAssistant() {
       try {
         const body: VoiceParseIn = { text, mode: premium ? "ai" : "simple" };
         const out = await apiPost<VoiceParseOut>("/voice/parse", body);
-        if (out.draft) {
+        if (out.briefing) {
+          setBriefing(out.briefing);
+          setPhase("briefing");
+          if (speakEnabled()) void readAloud(out.briefing);
+        } else if (out.draft) {
           setDraft(out.draft);
           setUsedAi(out.mode === "ai");
           setPhase("preview");
-          setTimeout(() => void confirmLoop(), 50);
+          const summary = describeDraft(out.draft, unit);
+          setTimeout(async () => {
+            if (speakEnabled()) await readAloud(`${summary} Say yes to save, or go back.`);
+            void confirmLoop();
+          }, 50);
         } else {
+          if (speakEnabled()) void speak(out.message?.split(". ")[0] ?? "Sorry, I didn't get that.");
           setMessage(out.message ?? "I couldn't understand that.");
           setPhase("idle");
         }
@@ -144,14 +205,16 @@ export function VoiceAssistant() {
         setPhase("idle");
       }
     },
-    [premium, confirmLoop],
+    [premium, confirmLoop, unit], // eslint-disable-line react-hooks/exhaustive-deps
   );
 
   const start = useCallback(
     async (prefill?: string) => {
       setOpen(true);
+      stopSpeaking();
       setMessage(null);
       setDraft(null);
+      setBriefing(null);
       setInterim("");
       setTranscript("");
       if (prefill) return understand(prefill);
@@ -188,8 +251,16 @@ export function VoiceAssistant() {
   const startRef = useRef(start);
   startRef.current = start;
 
+  async function readAloud(text: string) {
+    setSpeaking(true);
+    await speak(text, freshSignal());
+    setSpeaking(false);
+  }
+
   function close() {
     abortRef.current?.abort();
+    stopSpeaking();
+    setSpeaking(false);
     setOpen(false);
     setPhase("idle");
     setDraft(null);
@@ -236,9 +307,11 @@ export function VoiceAssistant() {
             <DialogDescription>
               {phase === "preview"
                 ? 'Say "yes" to save or "go back" to try again.'
-                : premium
+                : phase === "briefing"
+                  ? "Here's your day."
+                  : premium
                   ? 'Just say it naturally — e.g. "lunch with Priya next Thursday at half twelve".'
-                  : 'Say e.g. "appointment dentist tomorrow at 3pm", "remind me to call mum Friday at 6pm" or "habit read 20 pages".'}
+                  : 'Say e.g. "appointment dentist tomorrow at 3pm", "remind me to call mum Friday at 6pm", "add milk and eggs to the shopping list", "I ran 5k" or "what\'s my day?".'}
             </DialogDescription>
           </DialogHeader>
 
@@ -306,17 +379,59 @@ export function VoiceAssistant() {
                   <Badge className="gap-1" data-testid="voice-kind-badge">
                     <Meta.icon className="size-3" /> {Meta.label}
                   </Badge>
-                  {draft.date && draft.kind !== "habit" && (
+                  {speaking && (
+                    <Volume2 className="size-3.5 animate-pulse text-primary" data-testid="voice-speaking-indicator" />
+                  )}
+                  {draft.date && isDated(draft) && (
                     <span className="text-xs text-muted-foreground" data-testid="voice-preview-date">
                       {fmtShort(draft.date)}
                     </span>
                   )}
                 </div>
-                <div className="grid gap-1.5">
-                  <Label htmlFor="voice-title">{draft.kind === "habit" ? "Habit" : "Title"}</Label>
-                  <Input id="voice-title" value={draft.title} onChange={(e) => set({ title: e.target.value })} data-testid="voice-title-input" />
-                </div>
-                {draft.kind !== "habit" && (
+                {(isDated(draft) || draft.kind === "habit") && (
+                  <div className="grid gap-1.5">
+                    <Label htmlFor="voice-title">{draft.kind === "habit" ? "Habit" : "Title"}</Label>
+                    <Input id="voice-title" value={draft.title} onChange={(e) => set({ title: e.target.value })} data-testid="voice-title-input" />
+                  </div>
+                )}
+                {draft.kind === "shopping" && (
+                  <ul className="space-y-1.5" data-testid="voice-shopping-items">
+                    {draft.items.map((item, i) => (
+                      <li key={i} className="flex items-center gap-2">
+                        <Input value={item} aria-label={`Item ${i + 1}`} data-testid={`voice-shopping-item-${i}`}
+                          onChange={(e) => set({ items: draft.items.map((x, j) => (j === i ? e.target.value : x)) })} />
+                        <Button variant="ghost" size="icon" aria-label="Remove item" data-testid={`voice-shopping-remove-${i}`}
+                          disabled={draft.items.length < 2} onClick={() => set({ items: draft.items.filter((_, j) => j !== i) })}>
+                          <X className="size-4" />
+                        </Button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {draft.kind === "checkoff" && (
+                  <div className="space-y-3 rounded-xl border bg-muted/40 p-3" data-testid="voice-checkoff-target">
+                    <div className="flex items-center gap-2.5">
+                      <span className="text-2xl">{draft.emoji}</span>
+                      <div className="grid">
+                        <span className="font-medium" data-testid="voice-checkoff-title">{draft.title}</span>
+                        <span className="text-xs text-muted-foreground" data-testid="voice-checkoff-source">
+                          {draft.targetType === "routine" ? `${draft.routineKind === "morning" ? "Morning" : "Bedtime"} routine step` : "Habit"} · today
+                        </span>
+                      </div>
+                    </div>
+                    {draft.tracksDistance && (
+                      <div className="grid gap-1.5">
+                        <Label htmlFor="voice-distance-km">Distance ({unit})</Label>
+                        <Input id="voice-distance-km" type="number" min={0} step="0.1" className="w-28"
+                          value={draft.distanceKm != null ? Number(fromKm(draft.distanceKm, unit).toFixed(2)) : ""}
+                          placeholder="optional"
+                          onChange={(e) => set({ distanceKm: e.target.value === "" ? null : Math.max(0, toKm(Number(e.target.value), unit)) })}
+                          data-testid="voice-distance-input" />
+                      </div>
+                    )}
+                  </div>
+                )}
+                {isDated(draft) && (
                   <div className={cn("grid gap-2", draft.kind === "appointment" ? "grid-cols-3" : "grid-cols-2")}>
                     <div className="grid gap-1.5">
                       <Label htmlFor="voice-date">Date</Label>
@@ -375,10 +490,35 @@ export function VoiceAssistant() {
                     <RotateCcw className="size-4" /> Go back
                   </Button>
                   <Button size="sm" data-testid="voice-save-button"
-                    disabled={phase === "saving" || !draft.title.trim() || (draft.kind !== "habit" && !draft.date)}
-                    onClick={() => { abortRef.current?.abort(); setPhase("saving"); save.mutate(draft); }}>
+                    disabled={phase === "saving" || !draft.title.trim() || (isDated(draft) && !draft.date) ||
+                      (draft.kind === "shopping" && !draft.items.some((i) => i.trim()))}
+                    onClick={() => { abortRef.current?.abort(); stopSpeaking(); setPhase("saving"); save.mutate(draft); }}>
                     {phase === "saving" ? <Loader2 className="size-4 animate-spin" /> : null} Yes, save
                   </Button>
+                </div>
+              </motion.div>
+            )}
+
+            {phase === "briefing" && briefing && (
+              <motion.div key="briefing" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-3" data-testid="voice-briefing">
+                <p className="text-xs text-muted-foreground">
+                  Heard: <span className="italic" data-testid="voice-heard">“{transcript}”</span>
+                </p>
+                <p className="rounded-xl border bg-muted/40 p-3 text-sm leading-relaxed" data-testid="voice-briefing-text">
+                  {briefing}
+                </p>
+                <div className="flex justify-between gap-2">
+                  {speaking ? (
+                    <Button variant="outline" size="sm" data-testid="voice-briefing-stop-button"
+                      onClick={() => { abortRef.current?.abort(); stopSpeaking(); setSpeaking(false); }}>
+                      <Square className="size-3.5" /> Stop reading
+                    </Button>
+                  ) : (
+                    <Button variant="outline" size="sm" data-testid="voice-briefing-replay-button" onClick={() => void readAloud(briefing)}>
+                      <Volume2 className="size-4" /> Read aloud
+                    </Button>
+                  )}
+                  <Button size="sm" data-testid="voice-briefing-done-button" onClick={close}>Done</Button>
                 </div>
               </motion.div>
             )}

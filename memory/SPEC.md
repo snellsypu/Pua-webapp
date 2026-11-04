@@ -110,6 +110,21 @@ tomorrow's preview). Public URL: https://daily-loop-8--68ipsq2d.preview.emergent
     recognition only while the voice dialog is closed and the app is open; fuzzy-matches
     pua/poo-ah/puma etc.; "Hey PUA, <command>" parses the rest directly. Green dot on the mic
     when active. Confirmation "yes"/"go back" always uses browser recognition (buttons fallback).
+  - **Extra intents** (`lib/voice_intents.py`, checked before create-parsing; Premium AI also
+    returns kinds shopping/checkoff/briefing):
+    - Shopping: "add milk and eggs to the shopping list", "shopping list: …", "buy …" → draft
+      kind `shopping` with `items[]` (editable/removable rows) → one POST /shopping per item.
+    - Check-off: "I ran 5k / 3 miles", "done brushing teeth", "X is done" → resolved server-side
+      by token match against habits + today's routine steps (run/jog/distance → tracksDistance
+      habit) → draft kind `checkoff` {targetType habit|routine, targetId, routineKind,
+      distanceKm}. Already-ticked targets return a message, no draft. Save: routine → step
+      toggle; habit with distance → POST /habits/{id}/log; else toggle.
+    - Briefing: "what's my day?", "brief me", "how's my day" → `VoiceParseOut.briefing` text
+      (`lib/briefing.py`: greeting by settings.timezone, home weather, today's appointments,
+      open reminders, routine progress, habits left). Shown in the dialog and read aloud.
+  - **Spoken replies**: per-device toggle (localStorage `pua:speak`, default on) — speech
+    synthesis reads the preview summary, then listens for yes/go back; reads the briefing
+    (Stop / Read aloud buttons); says "Saved." after saving.
 - No payments: "premium" is a switch billed to the Emergent AI key, not a paid plan.
 
 ## Health data model

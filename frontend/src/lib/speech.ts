@@ -181,3 +181,43 @@ export function startWakeListener(onWake: (rest: string) => void): () => void {
     rec?.abort();
   };
 }
+
+// ---- spoken replies (speech synthesis) — a device-local preference, on by default
+export const SPEAK_KEY = "pua:speak";
+export const speechOutputSupported = () => typeof window !== "undefined" && "speechSynthesis" in window;
+export const speakEnabled = () => speechOutputSupported() && localStorage.getItem(SPEAK_KEY) !== "0";
+
+export function stopSpeaking() {
+  if (speechOutputSupported()) window.speechSynthesis.cancel();
+}
+
+/** Read text aloud; resolves when finished (or aborted / unsupported). */
+export function speak(text: string, signal?: AbortSignal): Promise<void> {
+  if (!speechOutputSupported() || !text) return Promise.resolve();
+  return new Promise((resolve) => {
+    const synth = window.speechSynthesis;
+    synth.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = lang();
+    u.rate = 1.03;
+    const voice = synth.getVoices().find((v) => v.lang === u.lang) ?? synth.getVoices().find((v) => v.lang.startsWith(u.lang.slice(0, 2)));
+    if (voice) u.voice = voice;
+    let settled = false;
+    const done = () => {
+      if (!settled) {
+        settled = true;
+        clearTimeout(guard);
+        resolve();
+      }
+    };
+    // Some engines never fire onend — cap at a generous reading time.
+    const guard = setTimeout(done, 2000 + text.length * 90);
+    u.onend = done;
+    u.onerror = done;
+    signal?.addEventListener("abort", () => {
+      synth.cancel();
+      done();
+    });
+    synth.speak(u);
+  });
+}

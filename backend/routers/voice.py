@@ -18,6 +18,8 @@ from pydantic import ValidationError
 
 from lib.db import db
 from lib.dates import today_iso
+from lib.briefing import build_briefing
+from lib.voice_intents import is_briefing, match_score, parse_checkoff, parse_shopping, tokens
 from lib.voice_simple import EXAMPLES, parse_simple
 from models.voice import VoiceDraft, VoiceParseIn, VoiceParseOut, VoiceTranscript
 
@@ -28,7 +30,7 @@ MAX_AUDIO_MB = 10
 AUDIO_EXT = {"audio/webm": "webm", "audio/mp4": "mp4", "audio/mpeg": "mp3", "audio/wav": "wav",
              "audio/x-m4a": "m4a", "audio/m4a": "m4a", "audio/ogg": "webm", "video/webm": "webm"}
 
-AI_SYSTEM = """You turn one spoken sentence into a calendar item for the PUA planner app.
+AI_SYSTEM = """You turn one spoken sentence into an action for the PUA planner app.
 Today is {today} ({weekday}). Resolve relative dates ("next Tuesday", "in 3 days") from today.
 Return ONLY a JSON object, no prose, no code fences, with these keys:
   "kind": "appointment" | "habit" | "reminder"   (things to remember or do = reminder; things at a
@@ -44,7 +46,13 @@ Return ONLY a JSON object, no prose, no code fences, with these keys:
   "monthlyTarget": integer 1-99           (habit, monthly mode; default 12)
   "tracksDistance": true|false            (habit; true for running/jogging distance)
 Vague times: morning 09:00, afternoon 14:00, evening 18:00, tonight 20:00.
-If the sentence is not a request to add an appointment, habit or reminder, return {{"kind": null}}."""
+Other kinds:
+  {{"kind": "shopping", "title": "Shopping list", "items": ["Milk", "Eggs"]}}  — adding things to the
+          shopping/grocery list; one short item per entry, capitalised, no quantities words like "some".
+  {{"kind": "checkoff", "title": "<what they did, e.g. run / brush teeth / read>", "distanceKm": number|null}}
+          — the user says they did or finished something (a habit or routine step). Convert miles to km.
+  {{"kind": "briefing", "title": "Briefing"}} — they ask what their day looks like / for a briefing.
+If the sentence is none of these, return {{"kind": null}}."""
 
 
 async def _premium_enabled() -> bool:
@@ -62,7 +70,7 @@ def _extract_json(text: str) -> dict | None:
         return None
 
 
-async def _parse_ai(text: str, today: date) -> VoiceDraft | None:
+async def _parse_ai(text: str, today: date) -> dict | None:
     chat = LlmChat(
         api_key=os.environ["EMERGENT_LLM_KEY"],
         session_id=f"voice-{uuid.uuid4()}",  # stateless: one fresh session per command
@@ -75,14 +83,74 @@ async def _parse_ai(text: str, today: date) -> VoiceDraft | None:
         elif isinstance(ev, StreamDone):
             break
     data = _extract_json("".join(out))
-    if not data or not data.get("kind"):
+    return data if data and data.get("kind") else None
+
+
+def _to_draft(data: dict) -> VoiceDraft | None:
+    if data.get("kind") not in ("appointment", "habit", "reminder"):
         return None
-    data = {k: v for k, v in data.items() if v is not None or k in ("date", "startTime", "endTime", "time")}
+    allowed = {"kind", "title", "date", "startTime", "endTime", "location", "time", "emoji",
+               "habitMode", "monthlyTarget", "tracksDistance"}
+    data = {k: v for k, v in data.items() if k in allowed and (v is not None or k in ("date", "startTime", "endTime", "time"))}
     try:
         return VoiceDraft(**data)
     except ValidationError:
         logger.warning("AI draft failed validation: %s", data)
         return None
+
+
+async def _resolve_checkoff(phrase: str, km: float | None) -> tuple[VoiceDraft | None, str | None]:
+    """Match "brushing teeth" / "run" to a habit or routine step and build a check-off draft."""
+    today = today_iso()
+    p = tokens(phrase)
+    is_run = bool(p & {"run", "jog"}) or km is not None
+    habits = await db.habits.find().to_list(200)
+    done_habits = {c["habitId"] for c in await db.habit_completions.find({"date": today}).to_list(1000)}
+    best: tuple[float, dict] | None = None
+    for h in habits:
+        score = match_score(p, h["name"])
+        if is_run and h.get("tracksDistance"):
+            score += 1.0
+        if score > 0 and (best is None or score > best[0]):
+            best = (score, {"type": "habit", "doc": h})
+    for r in await db.routines.find().to_list(10):
+        check = await db.routine_checks.find_one({"kind": r["kind"], "date": today}) or {}
+        for st in r.get("steps", []):
+            score = match_score(p, st["text"])
+            if score > 0 and (best is None or score > best[0] + 0.001):
+                best = (score, {"type": "routine", "doc": st, "kind": r["kind"],
+                                "done": st["id"] in check.get("doneStepIds", [])})
+    if not best or best[0] < 0.5:
+        return None, (f"I couldn't find a habit or routine step matching “{phrase}”. "
+                      'Try its name, e.g. "done brush teeth" or "I ran 5k".')
+    hit = best[1]
+    if hit["type"] == "habit":
+        h = hit["doc"]
+        dist = km if h.get("tracksDistance") else None
+        if h["id"] in done_habits and dist is None:
+            return None, f"{h['name']} is already ticked off today."
+        return VoiceDraft(kind="checkoff", title=h["name"], emoji=h.get("emoji", "🎯"), targetType="habit",
+                          targetId=h["id"], tracksDistance=bool(h.get("tracksDistance")), distanceKm=dist), None
+    st = hit["doc"]
+    if hit["done"]:
+        return None, f"“{st['text']}” is already ticked off in your {hit['kind']} routine."
+    return VoiceDraft(kind="checkoff", title=st["text"], emoji="☀️" if hit["kind"] == "morning" else "🌙",
+                      targetType="routine", targetId=st["id"], routineKind=hit["kind"]), None
+
+
+async def _intents(text: str) -> VoiceParseOut | None:
+    """Briefing / shopping / check-off phrases (free mode, and the cheap first pass in Premium)."""
+    if is_briefing(text):
+        return VoiceParseOut(transcript=text, mode="simple", briefing=await build_briefing())
+    items = parse_shopping(text)
+    if items:
+        return VoiceParseOut(transcript=text, mode="simple",
+                             draft=VoiceDraft(kind="shopping", title="Shopping list", items=items))
+    co = parse_checkoff(text)
+    if co:
+        draft, message = await _resolve_checkoff(*co)
+        return VoiceParseOut(transcript=text, mode="simple", draft=draft, message=message)
+    return None
 
 
 @router.post("/parse", response_model=VoiceParseOut)
@@ -92,18 +160,41 @@ async def parse(input: VoiceParseIn):
     if input.mode == "ai":
         if not await _premium_enabled():
             raise HTTPException(status_code=403, detail="Premium voice is off — turn it on in Settings")
+        if is_briefing(text):
+            return VoiceParseOut(transcript=text, mode="simple", briefing=await build_briefing())
         try:
-            draft = await _parse_ai(text, today)
+            raw = await _parse_ai(text, today)
         except Exception:  # provider/network trouble — fall back so the user isn't stuck
             logger.exception("AI parse failed; falling back to simple phrases")
-            draft = None
-        if draft:
-            return VoiceParseOut(transcript=text, mode="ai", draft=draft)
+            raw = None
+        if raw is not None:
+            kind = raw.get("kind")
+            if kind == "briefing":
+                return VoiceParseOut(transcript=text, mode="ai", briefing=await build_briefing())
+            if kind == "checkoff":
+                km = raw.get("distanceKm")
+                draft, message = await _resolve_checkoff(str(raw.get("title") or ""), float(km) if km else None)
+                return VoiceParseOut(transcript=text, mode="ai", draft=draft, message=message)
+            if kind == "shopping":
+                items = [str(i).strip()[:80] for i in raw.get("items") or [] if str(i).strip()][:20]
+                if items:
+                    return VoiceParseOut(transcript=text, mode="ai",
+                                         draft=VoiceDraft(kind="shopping", title="Shopping list", items=items))
+            else:
+                draft = _to_draft(raw)
+                if draft:
+                    return VoiceParseOut(transcript=text, mode="ai", draft=draft)
+        fallback = await _intents(text)
+        if fallback and (fallback.draft or fallback.briefing):
+            return fallback
         simple, _ = parse_simple(text, today)
         if simple:
             return VoiceParseOut(transcript=text, mode="simple", draft=simple)
         return VoiceParseOut(transcript=text, mode="ai",
-                             message="I couldn't turn that into an appointment, habit or reminder. " + EXAMPLES)
+                             message="I couldn't turn that into something PUA can do. " + EXAMPLES)
+    found = await _intents(text)
+    if found:
+        return found
     draft, message = parse_simple(text, today)
     return VoiceParseOut(transcript=text, mode="simple", draft=draft, message=message)
 

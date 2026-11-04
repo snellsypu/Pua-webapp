@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field, field_validator
 
 from models.planner import DATE_RE, TIME_RE
 
-VoiceKind = Literal["appointment", "habit", "reminder"]
+VoiceKind = Literal["appointment", "habit", "reminder", "shopping", "checkoff"]
 
 
 class VoiceDraft(BaseModel):
@@ -25,6 +25,13 @@ class VoiceDraft(BaseModel):
     habitMode: Literal["streak", "monthly"] = "streak"
     monthlyTarget: int = Field(default=12, ge=1, le=99)
     tracksDistance: bool = False
+    # shopping — one list entry per item
+    items: list[str] = Field(default_factory=list, max_length=20)
+    # checkoff — tick an existing habit or routine step (title = its name)
+    targetType: Literal["habit", "routine"] | None = None
+    targetId: str | None = None  # habit id, or routine step id
+    routineKind: Literal["morning", "bedtime"] | None = None
+    distanceKm: float | None = Field(default=None, ge=0, le=500)
 
     @field_validator("date")
     @classmethod
@@ -47,6 +54,7 @@ class VoiceParseOut(BaseModel):
     mode: Literal["simple", "ai"]
     draft: VoiceDraft | None = None
     message: str | None = None  # why nothing could be understood, with examples
+    briefing: str | None = None  # "what's my day?" — text to show and read aloud
 
 
 class VoiceTranscript(BaseModel):

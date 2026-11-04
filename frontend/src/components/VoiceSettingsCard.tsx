@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { Mic, Sparkles } from "lucide-react";
 import { apiGet, apiPut } from "@/lib/api";
 import type { AppSettings } from "@/lib/types";
-import { browserSpeechSupported } from "@/lib/speech";
+import { browserSpeechSupported, SPEAK_KEY, speak, speechOutputSupported } from "@/lib/speech";
 import { WAKE_EVENT, WAKE_KEY } from "@/components/VoiceAssistant";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -14,6 +14,12 @@ export function VoiceSettingsCard() {
   const settings = useQuery({ queryKey: ["settings"], queryFn: () => apiGet<AppSettings>("/settings") });
   const [wake, setWake] = useState(() => localStorage.getItem(WAKE_KEY) === "1");
   const speech = browserSpeechSupported();
+  const [talk, setTalk] = useState(() => localStorage.getItem(SPEAK_KEY) !== "0");
+  const toggleTalk = (on: boolean) => {
+    localStorage.setItem(SPEAK_KEY, on ? "1" : "0");
+    setTalk(on);
+    if (on) void speak("Spoken replies are on.");
+  };
 
   const setPremium = useMutation({
     mutationFn: (premiumVoice: boolean) => apiPut<AppSettings>("/settings", { premiumVoice }),
@@ -48,7 +54,8 @@ export function VoiceSettingsCard() {
           <Mic className="size-4" /> Voice
         </CardTitle>
         <CardDescription>
-          Tap the mic button (next to +) to add appointments, habits and reminders by speaking.
+          Tap the mic button (next to +) to add appointments, habits, reminders and shopping items,
+          tick things off (&ldquo;I ran 5k&rdquo;) or ask &ldquo;what&apos;s my day?&rdquo;.
           PUA shows a preview first — say &ldquo;yes&rdquo; to save or &ldquo;go back&rdquo; to try again.
         </CardDescription>
       </CardHeader>
@@ -86,6 +93,23 @@ export function VoiceSettingsCard() {
               {speech
                 ? 'Listens for "Hey PUA" while the app is open on this device (a green dot shows on the mic). Say it alone, or all at once: "Hey PUA, remind me to call mum at 6pm".'
                 : "Needs Chrome, Edge, Safari or Samsung Internet."}
+            </span>
+          </span>
+        </label>
+        <label htmlFor="spoken-replies" className="flex items-start gap-2.5 rounded-xl border p-3">
+          <Checkbox
+            id="spoken-replies"
+            checked={talk && speechOutputSupported()}
+            disabled={!speechOutputSupported()}
+            onCheckedChange={(c) => toggleTalk(c === true)}
+            data-testid="settings-spoken-replies"
+          />
+          <span className="grid gap-0.5">
+            <span className="text-sm font-medium">Spoken replies</span>
+            <span className="text-xs text-muted-foreground">
+              {speechOutputSupported()
+                ? "PUA reads each preview and your day briefing aloud, then listens for “yes” or “go back” — hands-free. On this device only."
+                : "This browser can't speak aloud."}
             </span>
           </span>
         </label>

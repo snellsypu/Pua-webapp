@@ -250,7 +250,7 @@ export interface PushSendResult {
 }
 
 // Mirrors backend/models/voice.py
-export type VoiceKind = "appointment" | "habit" | "reminder";
+export type VoiceKind = "appointment" | "habit" | "reminder" | "shopping" | "checkoff";
 
 export interface VoiceDraft {
   kind: VoiceKind;
@@ -264,6 +264,11 @@ export interface VoiceDraft {
   habitMode: HabitMode;
   monthlyTarget: number;
   tracksDistance: boolean;
+  items: string[];
+  targetType: "habit" | "routine" | null;
+  targetId: string | null;
+  routineKind: "morning" | "bedtime" | null;
+  distanceKm: number | null;
 }
 
 export interface VoiceParseIn {
@@ -276,6 +281,7 @@ export interface VoiceParseOut {
   mode: "simple" | "ai";
   draft: VoiceDraft | null;
   message: string | null;
+  briefing: string | null;
 }
 
 export interface VoiceTranscript {

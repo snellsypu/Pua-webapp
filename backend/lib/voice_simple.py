@@ -123,8 +123,8 @@ def _clean_title(text: str) -> str:
     return t[:1].upper() + t[1:] if t else ""
 
 
-EXAMPLES = ('Try: "appointment dentist tomorrow at 3pm", "remind me to call mum Friday at 6pm", '
-            'or "habit read 20 pages".')
+EXAMPLES = ('Try: "appointment dentist tomorrow at 3pm", "remind me to call mum Friday at 6pm", "habit read 20 pages", '
+            '"add milk and eggs to the shopping list", "I ran 5k" or "what\'s my day?".')
 
 
 def parse_simple(raw: str, today: date) -> tuple[VoiceDraft | None, str | None]:
