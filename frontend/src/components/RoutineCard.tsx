@@ -20,6 +20,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import { HandsFreeRoutine } from "@/components/HandsFreeRoutine";
 
 export function RoutineCard({
   routine,
@@ -136,10 +137,12 @@ export function RoutineCard({
             })}
           </ul>
         )}
-        {routine.complete && (
+        {routine.complete ? (
           <p className="flex items-center gap-1.5 text-sm font-medium text-primary" data-testid={`routine-complete-${routine.kind}`}>
             <Check className="size-4" /> All done for today
           </p>
+        ) : (
+          total > 0 && <HandsFreeRoutine kind={routine.kind as "morning" | "bedtime"} />
         )}
       </CardContent>
       <RoutineEditDialog routine={routine} open={editing} onOpenChange={setEditing} />

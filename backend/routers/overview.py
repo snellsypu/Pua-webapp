@@ -10,7 +10,7 @@ from pymongo import ASCENDING
 from fastapi import APIRouter, HTTPException, Query
 
 from lib.db import db
-from lib.dates import today_iso
+from lib.dates import today_iso, wake_time_for
 from models.planner import (
     MEAL_SLOTS,
     Appointment,
@@ -75,7 +75,12 @@ async def get_daypart():
         now = datetime.now(ZoneInfo("UTC"))
     review = settings.get("reviewTime") or "18:00"
     local = now.strftime("%H:%M")
-    return DayPart(part="evening" if local >= review else "morning", localTime=local, date=today_iso(), reviewTime=review)
+    today = now.strftime("%Y-%m-%d")
+    bedtime = await db.routines.find_one({"kind": "bedtime"}) or {}
+    return DayPart(
+        part="evening" if local >= review else "morning", localTime=local, date=today, reviewTime=review,
+        wakeTime=wake_time_for(settings, today), bedtimeTime=bedtime.get("time", "22:00"),
+    )
 
 
 @router.get("/range", response_model=RangeBundle)

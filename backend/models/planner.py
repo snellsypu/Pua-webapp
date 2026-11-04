@@ -49,6 +49,16 @@ class Location(BaseModel):
     country: str | None = None
 
 
+TRAVEL_MODES = ("car", "foot", "bike")
+_HHMM = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
+
+
+def _travel_mode(v: str | None) -> str | None:
+    if v is not None and v not in TRAVEL_MODES:
+        raise ValueError("travelMode must be car, foot or bike")
+    return v
+
+
 class AppSettings(BaseModel):
     id: str = "app"
     home: Location | None = None
@@ -59,6 +69,10 @@ class AppSettings(BaseModel):
     reviewTime: str = "18:00"  # overview switches from today's briefing to tomorrow's review
     wakeTime: str = "07:00"  # wake-up notification time (settings.timezone)
     wakeNotify: bool = False
+    weekendWakeTime: str | None = None  # Sat/Sun wake-up time; None = same as weekdays
+    homeAddress: Location | None = None  # street address — start point for commute times
+    travelMode: str = "car"  # default for commute times: car | foot | bike
+    liveLocation: bool = False  # Premium: commute from where the phone is, not home
 
 
 class DayPart(BaseModel):
@@ -68,6 +82,8 @@ class DayPart(BaseModel):
     localTime: str  # HH:MM now
     date: str  # server-anchored today
     reviewTime: str
+    wakeTime: str  # today's effective wake-up time (weekend time on Sat/Sun when set)
+    bedtimeTime: str  # bedtime routine time
 
 
 class SettingsUpdate(BaseModel):
@@ -81,13 +97,22 @@ class SettingsUpdate(BaseModel):
     reviewTime: str | None = None
     wakeTime: str | None = None
     wakeNotify: bool | None = None
+    weekendWakeTime: str | None = None  # explicit null = same as weekdays
+    homeAddress: Location | None = None  # explicit null clears
+    travelMode: str | None = None
+    liveLocation: bool | None = None
 
-    @field_validator("reviewTime", "wakeTime")
+    @field_validator("reviewTime", "wakeTime", "weekendWakeTime")
     @classmethod
     def _check_hhmm(cls, v: str | None) -> str | None:
-        if v is not None and not re.match(r"^([01]\d|2[0-3]):[0-5]\d$", v):
+        if v is not None and not _HHMM.match(v):
             raise ValueError("time must be HH:MM")
         return v
+
+    @field_validator("travelMode")
+    @classmethod
+    def _check_mode(cls, v: str | None) -> str | None:
+        return _travel_mode(v)
 
     @field_validator("units")
     @classmethod
@@ -126,6 +151,7 @@ class Appointment(BaseModel):
     endTime: str | None = None
     location: str = ""
     notes: str = ""
+    travelMode: str | None = None  # Premium: per-appointment commute mode (None = default)
     createdAt: datetime = Field(default_factory=_now)
 
     @field_validator("date")
@@ -146,6 +172,12 @@ class AppointmentCreate(BaseModel):
     endTime: str | None = None
     location: str = ""
     notes: str = ""
+    travelMode: str | None = None
+
+    @field_validator("travelMode")
+    @classmethod
+    def _check_mode(cls, v: str | None) -> str | None:
+        return _travel_mode(v)
 
     @field_validator("date")
     @classmethod
@@ -165,6 +197,12 @@ class AppointmentUpdate(BaseModel):
     endTime: str | None = None
     location: str | None = None
     notes: str | None = None
+    travelMode: str | None = None  # explicit null = back to the default mode
+
+    @field_validator("travelMode")
+    @classmethod
+    def _check_mode(cls, v: str | None) -> str | None:
+        return _travel_mode(v)
 
     @field_validator("date")
     @classmethod

@@ -69,6 +69,27 @@ tomorrow's preview). Public URL: https://daily-loop-8--68ipsq2d.preview.emergent
      cron (now every 5 min) via `_maybe_wake`, claimed per day with
      `settings.lastWakeNotifiedDate`; tap opens /overview?wake=1. Routine pushes now open
      /overview?view=today|tomorrow.
+- **Weekend wake**: `settings.weekendWakeTime` (null = same as weekdays) — `lib/dates.wake_time_for`
+  picks it on Sat/Sun for the wake push and the first-open window (`DayPart.wakeTime`).
+- **Bedtime read-out** (`/overview?bedtime=1`, WakeBanner kind="bedtime", `GET /api/voice/bedtime`):
+  tomorrow's weather, first appointment (+N more) with commute from home, meals, "Sleep well!".
+  Triggers: the bedtime routine push (now opens /overview?bedtime=1) and the optional device-local
+  "read on first open" (`pua:bedtime-first-open`, within 3 h after the bedtime routine time,
+  `DayPart.bedtimeTime`; once per night via `pua:last-bedtime`).
+- **Commute** (`lib/travel.py`, OSM Nominatim search + FOSSGIS OSRM routed-car/foot/bike, no key,
+  identifying UA, app-wide 1 req/s lock, Mongo caches `geocode_cache` / `route_cache`): the wake
+  read-out adds the next appointment today (startTime ≥ now) and "It's about N minutes by car
+  from home — leave by HH:MM" (start − travel − 10 min buffer; "leave now" if past). Start point:
+  `settings.homeAddress` (Settings → Commute times, `GET /api/address/search?q=`, explicit
+  submit only); no address → hint to add one; unfindable place → says so. Mode:
+  `settings.travelMode` (car|foot|bike, default car). **Premium** (`premiumVoice` switch, now
+  labelled "Premium"): per-appointment `Appointment.travelMode` (dialog select, null = default;
+  ignored server-side without Premium) and `settings.liveLocation` (wake read-out sends the
+  phone's lat/lon → `/voice/wake?lat&lon`). OSM attribution shown on banner + settings card.
+  Seeded locations ("Office", "Dr. Lee, Maple St") are not geocodable — real addresses are.
+- **Hands-free routine** (components/HandsFreeRoutine.tsx): "Hands-free" button on routine cards
+  (when not complete) and on the read-out banners. Speaks each open step, listens (browser
+  recognition) for done/next → toggles the step; skip; repeat; stop. Ends with the streak.
 - `/settings` — home city search/detect, light/dark/system theme (next-themes), units.
 - **Create FAB** (`components/CreateFab.tsx`, mounted in AppShell on every page) — bottom-right
   "+" opens a menu: Reminder / Habit / Appointment, each opening its dialog with the date

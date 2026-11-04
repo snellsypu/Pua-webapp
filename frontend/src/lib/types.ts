@@ -10,6 +10,7 @@ export interface Location {
 }
 
 export type DistanceUnit = "km" | "mi";
+export type TravelMode = "car" | "foot" | "bike";
 
 export interface AppSettings {
   id: string;
@@ -21,6 +22,10 @@ export interface AppSettings {
   reviewTime: string; // HH:MM — overview flips to tomorrow's review
   wakeTime: string; // HH:MM — wake-up notification
   wakeNotify: boolean;
+  weekendWakeTime: string | null; // Sat/Sun; null = same as weekdays
+  homeAddress: Location | null; // commute start point
+  travelMode: TravelMode;
+  liveLocation: boolean; // Premium: commute from the phone's location
 }
 
 // Mirrors DayPart in backend/models/planner.py
@@ -29,6 +34,8 @@ export interface DayPart {
   localTime: string;
   date: string;
   reviewTime: string;
+  wakeTime: string; // today's effective wake-up time
+  bedtimeTime: string;
 }
 
 // Partial PUT — only the fields sent change. home: null clears the home city.
@@ -41,6 +48,10 @@ export interface SettingsUpdate {
   reviewTime?: string;
   wakeTime?: string;
   wakeNotify?: boolean;
+  weekendWakeTime?: string | null;
+  homeAddress?: Location | null;
+  travelMode?: TravelMode;
+  liveLocation?: boolean;
 }
 
 export interface Appointment {
@@ -51,6 +62,7 @@ export interface Appointment {
   endTime: string | null;
   location: string;
   notes: string;
+  travelMode: TravelMode | null; // Premium per-appointment mode; null = default
 }
 
 export interface AppointmentCreate {
@@ -60,6 +72,7 @@ export interface AppointmentCreate {
   endTime?: string | null;
   location?: string;
   notes?: string;
+  travelMode?: TravelMode | null;
 }
 
 export type HabitMode = "streak" | "monthly";

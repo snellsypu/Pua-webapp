@@ -11,19 +11,28 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { WAKE_FIRST_OPEN_KEY } from "@/components/WakeBanner";
+import { BEDTIME_FIRST_OPEN_KEY, WAKE_FIRST_OPEN_KEY } from "@/components/WakeBanner";
 
 export function OverviewWakeCard() {
   const qc = useQueryClient();
   const settings = useQuery({ queryKey: ["settings"], queryFn: () => apiGet<AppSettings>("/settings") });
   const [review, setReview] = useState("18:00");
   const [wakeTime, setWakeTime] = useState("07:00");
+  const [weekendTime, setWeekendTime] = useState("09:00");
   useEffect(() => {
     if (settings.data) {
       setReview(settings.data.reviewTime);
       setWakeTime(settings.data.wakeTime);
+      setWeekendTime(settings.data.weekendWakeTime ?? "09:00");
     }
   }, [settings.data]);
+  const weekendOn = settings.data?.weekendWakeTime != null;
+  const [bedFirstOpen, setBedFirstOpen] = useState(() => localStorage.getItem(BEDTIME_FIRST_OPEN_KEY) === "1");
+  const toggleBedFirstOpen = (on: boolean) => {
+    localStorage.setItem(BEDTIME_FIRST_OPEN_KEY, on ? "1" : "0");
+    setBedFirstOpen(on);
+    toast.success(on ? "PUA will read tomorrow the first time you open it at bedtime" : "Bedtime auto-read off");
+  };
 
   const save = useMutation({
     mutationFn: (u: SettingsUpdate) => apiPut<AppSettings>("/settings", u),
@@ -33,7 +42,9 @@ export function OverviewWakeCard() {
       toast.success(
         u.reviewTime ? `Overview switches at ${s.reviewTime}` : u.wakeNotify !== undefined
           ? s.wakeNotify ? `Wake-up notification at ${s.wakeTime}` : "Wake-up notification off"
-          : `Wake-up time ${s.wakeTime}`,
+          : "weekendWakeTime" in u
+            ? s.weekendWakeTime ? `Weekends: ${s.weekendWakeTime}` : "Weekends use the weekday time"
+            : `Wake-up time ${s.wakeTime}`,
       );
     },
     onError: () => toast.error("Could not save"),
@@ -131,6 +142,45 @@ export function OverviewWakeCard() {
               Save
             </Button>
           </div>
+          <label htmlFor="weekend-wake" className="flex items-center gap-2.5 text-sm">
+            <Checkbox id="weekend-wake" checked={weekendOn} disabled={save.isPending}
+              onCheckedChange={(c) => save.mutate({ weekendWakeTime: c === true ? weekendTime : null })}
+              data-testid="settings-weekend-wake-toggle" />
+            Later wake-up at weekends (Sat &amp; Sun)
+          </label>
+          {weekendOn && (
+            <div className="flex flex-wrap items-end gap-3 pl-6">
+              <div className="grid gap-1.5">
+                <Label htmlFor="weekend-wake-time">Weekend wake-up time</Label>
+                <Input id="weekend-wake-time" type="time" className="w-32" value={weekendTime}
+                  onChange={(e) => setWeekendTime(e.target.value)} data-testid="settings-weekend-wake-time" />
+              </div>
+              <Button size="sm" variant="outline" data-testid="settings-weekend-wake-save"
+                disabled={!weekendTime || weekendTime === settings.data?.weekendWakeTime || save.isPending}
+                onClick={() => save.mutate({ weekendWakeTime: weekendTime })}>
+                Save
+              </Button>
+            </div>
+          )}
+          <p className="text-xs text-muted-foreground">
+            Applies to the notification and the &ldquo;first open&rdquo; window — set your phone&apos;s weekend alarm to match.
+          </p>
+        </div>
+
+        <div className="space-y-2 rounded-xl border p-3">
+          <p className="text-sm font-medium">3 · Bedtime read-out</p>
+          <p className="text-xs text-muted-foreground">
+            PUA reads tomorrow&apos;s weather, first appointment (with travel time) and meals. Tap the bedtime
+            routine notification (turn it on below under Notifications), or let it start on its own:
+          </p>
+          <label htmlFor="bedtime-first-open" className="flex items-start gap-2.5">
+            <Checkbox id="bedtime-first-open" checked={bedFirstOpen} onCheckedChange={(c) => toggleBedFirstOpen(c === true)}
+              data-testid="settings-bedtime-first-open" />
+            <span className="text-sm">
+              Read tomorrow automatically the first time I open PUA after my bedtime routine time
+              <span className="block text-xs text-muted-foreground">Once a night, up to 3 hours after it · this device only</span>
+            </span>
+          </label>
         </div>
       </CardContent>
     </Card>

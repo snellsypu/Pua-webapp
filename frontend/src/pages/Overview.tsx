@@ -1,6 +1,7 @@
 // One overview that follows the clock: today's briefing until the review time
 // (Settings, default 18:00), then tomorrow's review. ?view=today|tomorrow pins
-// a view; ?wake=1 (wake-up link / notification) reads the morning out.
+// a view; ?wake=1 (wake-up link / notification) reads the morning out and
+// ?bedtime=1 (bedtime routine notification / first open) reads tomorrow out.
 import { useSearchParams } from "react-router-dom";
 import { MoonStar, Sunrise } from "lucide-react";
 import { useDayPart } from "@/lib/useDayPart";
@@ -13,7 +14,8 @@ export default function Overview() {
   const [params, setParams] = useSearchParams();
   const daypart = useDayPart();
   const wake = params.get("wake") === "1";
-  const pinned = params.get("view");
+  const bedtime = params.get("bedtime") === "1";
+  const pinned = params.get("view") ?? (bedtime ? "tomorrow" : null);
   const view: "today" | "tomorrow" =
     wake || pinned === "today"
       ? "today"
@@ -68,7 +70,8 @@ export default function Overview() {
         )}
       </div>
 
-      {wake && <WakeBanner onDismiss={() => setParams({}, { replace: true })} />}
+      {wake && <WakeBanner kind="wake" onDismiss={() => setParams({}, { replace: true })} />}
+      {bedtime && !wake && <WakeBanner kind="bedtime" onDismiss={() => setParams({ view: "tomorrow" }, { replace: true })} />}
 
       {view === "today" ? <Morning /> : <Evening />}
     </div>

@@ -36,6 +36,10 @@ def _out(doc: dict) -> AppSettings:
         reviewTime=doc.get("reviewTime", "18:00"),
         wakeTime=doc.get("wakeTime", "07:00"),
         wakeNotify=bool(doc.get("wakeNotify", False)),
+        weekendWakeTime=doc.get("weekendWakeTime"),
+        homeAddress=doc.get("homeAddress"),
+        travelMode=doc.get("travelMode", "car"),
+        liveLocation=bool(doc.get("liveLocation", False)),
     )
 
 
@@ -50,9 +54,11 @@ async def update_settings(input: SettingsUpdate):
     # Partial update: only fields the client sent change, so saving one setting
     # can never reset another. An explicit "home": null clears the home city.
     updates = input.model_dump(exclude_unset=True)
-    if "home" in updates and updates["home"] is not None:
-        updates["home"] = input.home.model_dump()  # type: ignore[union-attr]
-    updates = {k: v for k, v in updates.items() if v is not None or k == "home"}
+    for k in ("home", "homeAddress"):
+        if updates.get(k) is not None:
+            updates[k] = getattr(input, k).model_dump()
+    nullable = ("home", "homeAddress", "weekendWakeTime")
+    updates = {k: v for k, v in updates.items() if v is not None or k in nullable}
     updates["updatedAt"] = datetime.now(timezone.utc)
     await db.settings.update_one({"id": "app"}, {"$set": updates})
     return _out(await _get_or_create())

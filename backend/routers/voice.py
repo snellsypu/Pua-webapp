@@ -13,12 +13,12 @@ from datetime import date
 
 from emergentintegrations.llm.chat import LlmChat, StreamDone, TextDelta, UserMessage
 from emergentintegrations.llm.openai import OpenAISpeechToText
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi import APIRouter, File, HTTPException, Query, UploadFile
 from pydantic import ValidationError
 
 from lib.db import db
 from lib.dates import today_iso
-from lib.briefing import build_briefing, build_wake
+from lib.briefing import build_bedtime, build_briefing, build_wake
 from lib.voice_intents import is_briefing, match_score, parse_checkoff, parse_shopping, tokens
 from lib.voice_simple import EXAMPLES, parse_simple
 from models.voice import VoiceDraft, VoiceParseIn, VoiceParseOut, VoiceTranscript
@@ -200,9 +200,18 @@ async def parse(input: VoiceParseIn):
 
 
 @router.get("/wake", response_model=VoiceTranscript)
-async def wake_text():
-    """Text read aloud when the wake-up link / notification opens PUA."""
-    return VoiceTranscript(text=await build_wake())
+async def wake_text(lat: float | None = Query(default=None, ge=-90, le=90),
+                    lon: float | None = Query(default=None, ge=-180, le=180)):
+    """Text read aloud when the wake-up link / notification opens PUA. lat/lon (the
+    phone's live location) is only used with Premium + live location on."""
+    live = (lat, lon) if lat is not None and lon is not None else None
+    return VoiceTranscript(text=await build_wake(live))
+
+
+@router.get("/bedtime", response_model=VoiceTranscript)
+async def bedtime_text():
+    """Tomorrow read-out for the bedtime routine (notification tap / first open)."""
+    return VoiceTranscript(text=await build_bedtime())
 
 
 @router.post("/transcribe", response_model=VoiceTranscript)

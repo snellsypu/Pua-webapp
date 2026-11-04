@@ -18,7 +18,7 @@ import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { CreateFab } from "@/components/CreateFab";
 import { VoiceAssistant } from "@/components/VoiceAssistant";
-import { markWoken, shouldWakeOnOpen } from "@/components/WakeBanner";
+import { markRead, readOnOpen } from "@/components/WakeBanner";
 import { useDayPart } from "@/lib/useDayPart";
 import { apiGet } from "@/lib/api";
 import type { AppSettings } from "@/lib/types";
@@ -39,16 +39,21 @@ export default function AppShell() {
   const location = useLocation();
   const checked = useRef(false);
 
-  // Wake-up read: once per day, either opened via the wake link/notification, or the
-  // first open after the wake-up time when "read on first open" is on for this device.
+  // Wake-up / bedtime read-outs: once per day each, via link/notification, or the first
+  // open after the wake-up / bedtime-routine time when "read on first open" is on.
   useEffect(() => {
     const dp = daypart.data;
     if (!dp || !settings.data || checked.current) return;
     checked.current = true;
-    if (new URLSearchParams(location.search).get("wake") === "1") markWoken(dp.date);
-    else if (shouldWakeOnOpen(dp, settings.data.wakeTime)) {
-      markWoken(dp.date);
-      navigate("/overview?wake=1", { replace: true });
+    const q = new URLSearchParams(location.search);
+    if (q.get("wake") === "1") markRead("wake", dp.date);
+    else if (q.get("bedtime") === "1") markRead("bedtime", dp.date);
+    else {
+      const due = readOnOpen(dp);
+      if (due) {
+        markRead(due, dp.date);
+        navigate(`/overview?${due}=1`, { replace: true });
+      }
     }
   }, [daypart.data, settings.data, location.search, navigate]);
 

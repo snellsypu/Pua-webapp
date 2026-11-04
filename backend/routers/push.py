@@ -16,7 +16,7 @@ from pymongo.errors import DuplicateKeyError
 
 from lib import push as push_lib
 from lib.db import db
-from lib.dates import today_iso
+from lib.dates import today_iso, wake_time_for
 from models.push import PushPublicKey, PushSendResult, PushStatus, PushSubscriptionIn
 from routers.routines import ensure_routines, routine_state
 
@@ -66,7 +66,7 @@ async def _maybe_wake(settings: dict, now_local: datetime, local_date: str) -> N
     """Wake-up push at settings.wakeTime; tapping it opens PUA, which reads the morning out."""
     if not settings.get("wakeNotify") or settings.get("lastWakeNotifiedDate") == local_date:
         return
-    hh, mm = (int(p) for p in (settings.get("wakeTime") or "07:00").split(":"))
+    hh, mm = (int(p) for p in wake_time_for(settings, local_date).split(":"))
     scheduled = now_local.replace(hour=hh, minute=mm, second=0, microsecond=0)
     if not (timedelta(0) <= now_local - scheduled < WINDOW):
         return
@@ -114,7 +114,8 @@ async def run_routine_notifications() -> None:
         result = await push_lib.send_to_all(
             state.title,
             body,
-            url="/overview?view=today" if doc["kind"] == "morning" else "/overview?view=tomorrow",
+            # bedtime: tapping opens tomorrow's review and reads it out
+            url="/overview?view=today" if doc["kind"] == "morning" else "/overview?bedtime=1",
             tag=f"routine-{doc['kind']}",
         )
         logger.info("routine push %s: %s", doc["kind"], result.model_dump())

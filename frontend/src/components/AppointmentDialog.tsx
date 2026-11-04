@@ -1,9 +1,12 @@
 import { useEffect, useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Trash2 } from "lucide-react";
-import { apiDelete, apiPost, apiPut, ApiError } from "@/lib/api";
-import type { Appointment } from "@/lib/types";
+import { apiDelete, apiGet, apiPost, apiPut, ApiError } from "@/lib/api";
+import type { AppSettings, Appointment, TravelMode } from "@/lib/types";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
+export const TRAVEL_LABELS: Record<TravelMode, string> = { car: "Driving", foot: "Walking", bike: "Cycling" };
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -25,6 +28,7 @@ export interface AppointmentDraft {
   endTime?: string | null;
   location?: string;
   notes?: string;
+  travelMode?: TravelMode | null;
 }
 
 export function AppointmentDialog({
@@ -38,6 +42,9 @@ export function AppointmentDialog({
 }) {
   const qc = useQueryClient();
   const isEdit = !!initial?.id;
+  const settings = useQuery({ queryKey: ["settings"], queryFn: () => apiGet<AppSettings>("/settings") });
+  const premium = settings.data?.premiumVoice ?? false;
+  const [travel, setTravel] = useState<TravelMode | "default">("default");
   const [form, setForm] = useState({
     title: "",
     date: "",
@@ -57,6 +64,7 @@ export function AppointmentDialog({
         location: initial?.location ?? "",
         notes: initial?.notes ?? "",
       });
+      setTravel(initial?.travelMode ?? "default");
     }
   }, [open, initial]);
 
@@ -74,6 +82,8 @@ export function AppointmentDialog({
         endTime: form.endTime || null,
         location: form.location.trim(),
         notes: form.notes.trim(),
+        // Premium only; without Premium the field is left untouched.
+        ...(premium ? { travelMode: travel === "default" ? null : travel } : {}),
       };
       return isEdit
         ? apiPut<Appointment>(`/appointments/${initial!.id}`, payload)
@@ -158,10 +168,30 @@ export function AppointmentDialog({
               id="appt-location"
               value={form.location}
               onChange={(e) => setForm({ ...form, location: e.target.value })}
-              placeholder="Where? (optional)"
+              placeholder="Where? A street address gives a travel time (optional)"
               data-testid="appointment-location-input"
             />
           </div>
+          {premium && (
+            <div className="grid gap-1.5">
+              <Label htmlFor="appt-travel">Getting there</Label>
+              <Select value={travel} onValueChange={(v) => setTravel(v as TravelMode | "default")}>
+                <SelectTrigger id="appt-travel" className="w-56" data-testid="appointment-travel-select">
+                  <SelectValue>
+                    {travel === "default" ? `Default (${TRAVEL_LABELS[settings.data?.travelMode ?? "car"]})` : TRAVEL_LABELS[travel]}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="default" data-testid="appointment-travel-default">
+                    Default ({TRAVEL_LABELS[settings.data?.travelMode ?? "car"]})
+                  </SelectItem>
+                  {(Object.keys(TRAVEL_LABELS) as TravelMode[]).map((m) => (
+                    <SelectItem key={m} value={m} data-testid={`appointment-travel-${m}`}>{TRAVEL_LABELS[m]}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
           <div className="grid gap-1.5">
             <Label htmlFor="appt-notes">Notes</Label>
             <Textarea

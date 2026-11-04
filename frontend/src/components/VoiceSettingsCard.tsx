@@ -70,11 +70,12 @@ export function VoiceSettingsCard() {
           />
           <span className="grid gap-0.5">
             <span className="flex items-center gap-1.5 text-sm font-medium">
-              <Sparkles className="size-3.5" /> Premium voice
+              <Sparkles className="size-3.5" /> Premium
             </span>
             <span className="text-xs text-muted-foreground">
               AI transcription (works in every browser, including iPhone) and natural speech —
-              say it any way you like. Uses your Emergent AI credits, a small amount per command.
+              say it any way you like — plus a travel mode per appointment and live-location
+              commutes. Voice uses your Emergent AI credits, a small amount per command.
               Off: free mode using your browser&apos;s speech recognition and set phrases.
             </span>
           </span>
