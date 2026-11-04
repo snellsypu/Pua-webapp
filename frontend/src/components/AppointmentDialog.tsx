@@ -7,7 +7,7 @@ import type { AppSettings, Appointment, GeoPlace, TravelMode } from "@/lib/types
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 /** "Reading, Station Hill, Reading, England, RG1 1LZ, UK" → "Reading, Station Hill, Reading" */
-const shortName = (display: string) => display.split(",").map((p) => p.trim()).slice(0, 3).join(", ");
+export const shortName = (display: string) => display.split(",").map((p) => p.trim()).slice(0, 3).join(", ");
 
 export const TRAVEL_LABELS: Record<TravelMode, string> = {
   car: "Driving", foot: "Walking", bike: "Cycling", transit: "Public transport",
@@ -91,6 +91,7 @@ export function AppointmentDialog({
     qc.invalidateQueries({ queryKey: ["overview"] });
     qc.invalidateQueries({ queryKey: ["range"] });
     qc.invalidateQueries({ queryKey: ["commute-next"] });
+    qc.invalidateQueries({ queryKey: ["run-plan"] });
   };
 
   const save = useMutation({

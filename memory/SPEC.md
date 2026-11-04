@@ -116,6 +116,20 @@ tomorrow's preview). Public URL: https://daily-loop-8--68ipsq2d.preview.emergent
   max precip of this + next hour and wind/gusts (Open-Meteo `wind_speed_10m`/`wind_gusts_10m`,
   km/h; shown in mph when distance unit is mi) → verdict chip (rain ≥ 60 % / wind ≥ 35 or
   gusts ≥ 55 → warn; rain ≥ 30 % → showers; else "Good time for a run").
+- **Run time planner** (`lib/runplan.py`, `GET /api/run-plan` → `RunPlan | null`): first
+  tracksDistance habit not done today; full hourly forecast for the home city
+  (`weather.get_hourly_days`); slots from max(now+10 min, today's wake time) to bedtime routine
+  − 1 h − 45 min, skipping 45-min runs that overlap appointments (30 min before / 15 after,
+  default 60-min length); score = rain%·1.2 + (wind−15)·1.5 + |temp−12 °C|·0.8 + dark 25 +
+  lateness. Shown under RunWeather ("Best time today: 12:15 PM · dry, light wind, free before
+  your 2 PM Dentist · 9°") with a "Remind me" toggle → `settings.runReminders`; the cron
+  (`push._run_reminder`) pushes once a day between remindAt (time − 15 min) and the start,
+  claimed via `settings.lastRunReminderDate`. Null if no home city / no free slot / done.
+- **Pin on create (voice)**: after a voice appointment with a location saves, the dialog moves
+  to phase "pin": `/address/search` top 3 matches, spoken "Shall I pin X on the map? Say yes, or
+  skip." — "yes"/"pin" pins match 1 (PUT locationLat/Lon), "skip"/"no" closes; tap any match or
+  Skip. No match → message + Done; search unavailable (Nominatim 429/502) → "map search is
+  busy — pin it later from Settings" (`voice-pin-busy`).
 - **Hands-free routine** (components/HandsFreeRoutine.tsx): "Hands-free" button on routine cards
   (when not complete) and on the read-out banners. Speaks each open step, listens (browser
   recognition) for done/next → toggles the step; skip; repeat; stop. Ends with the streak.

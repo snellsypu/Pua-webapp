@@ -75,6 +75,21 @@ class AppSettings(BaseModel):
     liveLocation: bool = False  # Premium: commute from where the phone is, not home
     leaveAlerts: bool = False  # push "time to leave" before appointments (needs homeAddress)
     transitAvailable: bool = False  # read-only: a Google Maps key is configured
+    runReminders: bool = False  # push 15 min before the planned best run time
+
+
+class RunPlan(BaseModel):
+    """Best hour today for the running habit — weather + free time between appointments."""
+
+    habitId: str
+    habitName: str
+    time: str  # HH:MM start
+    temperature: float
+    precipProb: float
+    windSpeed: float  # km/h
+    isDay: bool
+    reason: str  # e.g. "dry, light wind, free until your 2 PM appointment"
+    remindAt: str  # HH:MM (time − 15 min)
 
 
 class CommuteNext(BaseModel):
@@ -132,6 +147,7 @@ class SettingsUpdate(BaseModel):
     travelMode: str | None = None
     liveLocation: bool | None = None
     leaveAlerts: bool | None = None
+    runReminders: bool | None = None
 
     @field_validator("reviewTime", "wakeTime", "weekendWakeTime")
     @classmethod

@@ -28,6 +28,20 @@ export interface AppSettings {
   liveLocation: boolean; // Premium: commute from the phone's location
   leaveAlerts: boolean; // "time to leave" pushes before appointments
   transitAvailable: boolean; // read-only: Google Maps key configured
+  runReminders: boolean; // push 15 min before the planned run time
+}
+
+// Mirrors RunPlan in backend/models/planner.py
+export interface RunPlan {
+  habitId: string;
+  habitName: string;
+  time: string;
+  temperature: number;
+  precipProb: number;
+  windSpeed: number; // km/h
+  isDay: boolean;
+  reason: string;
+  remindAt: string;
 }
 
 // Mirrors CommuteNext / LocationSuggestion in backend/models/planner.py
@@ -80,6 +94,7 @@ export interface SettingsUpdate {
   travelMode?: TravelMode;
   liveLocation?: boolean;
   leaveAlerts?: boolean;
+  runReminders?: boolean;
 }
 
 export interface Appointment {

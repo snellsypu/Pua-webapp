@@ -119,6 +119,30 @@ async def _leave_alerts(settings: dict, now_local: datetime) -> None:
         logger.info("leave alert %s: %s", a["id"], result.model_dump())
 
 
+async def _run_reminder(settings: dict, now_local: datetime) -> None:
+    """Push 15 min before the planned best run time, once a day (settings.lastRunReminderDate)."""
+    if not settings.get("runReminders"):
+        return
+    today = today_iso()
+    if settings.get("lastRunReminderDate") == today:
+        return
+    from lib.briefing import spoken_time
+    from lib.runplan import build_run_plan
+
+    plan = await build_run_plan()
+    now = now_local.strftime("%H:%M")
+    if not plan or not (plan["remindAt"] <= now < plan["time"]):
+        return
+    claimed = await db.settings.update_one(
+        {"id": "app", "lastRunReminderDate": {"$ne": today}}, {"$set": {"lastRunReminderDate": today}}
+    )
+    if not claimed.modified_count:
+        return
+    body = f"Best time for {plan['habitName'].lower()}: {spoken_time(plan['time'])} — {plan['reason']}."
+    result = await push_lib.send_to_all("Run time 🏃", body, url="/habits", tag="run-plan")
+    logger.info("run reminder: %s", result.model_dump())
+
+
 async def run_routine_notifications() -> None:
     settings = await db.settings.find_one({"id": "app"}) or {}
     try:
@@ -132,6 +156,10 @@ async def run_routine_notifications() -> None:
         await _leave_alerts(settings, now_local)
     except Exception:
         logger.exception("leave alerts failed")
+    try:
+        await _run_reminder(settings, now_local)
+    except Exception:
+        logger.exception("run reminder failed")
     for doc in await ensure_routines():
         if not doc.get("notify") or doc.get("lastNotifiedDate") == local_date:
             continue

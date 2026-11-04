@@ -43,6 +43,7 @@ def _out(doc: dict) -> AppSettings:
         liveLocation=bool(doc.get("liveLocation", False)),
         leaveAlerts=bool(doc.get("leaveAlerts", False)),
         transitAvailable=bool(os.environ.get("GOOGLE_MAPS_API_KEY")),
+        runReminders=bool(doc.get("runReminders", False)),
     )
 
 

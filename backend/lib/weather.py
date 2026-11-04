@@ -189,3 +189,28 @@ async def reverse(lat: float, lon: float) -> ReversePlace:
     place = ReversePlace(name=str(name), latitude=rlat, longitude=rlon)
     _cache[key] = (time.monotonic(), place)
     return place
+
+
+async def get_hourly_days(lat: float, lon: float, units: str = "celsius") -> list[dict]:
+    """Full hourly forecast for today + tomorrow (location-local times) — for the run planner."""
+    data = await _get(
+        FORECAST_URL,
+        {
+            "latitude": lat,
+            "longitude": lon,
+            "hourly": "temperature_2m,precipitation_probability,wind_speed_10m,is_day",
+            "forecast_days": 2,
+            "timezone": "auto",
+            "temperature_unit": units,
+        },
+        ttl=900,
+    )
+    h = data.get("hourly") or {}
+    return [
+        {"date": t[:10], "time": t[11:16], "temperature": float(temp or 0), "precipProb": float(p or 0),
+         "windSpeed": float(w or 0), "isDay": bool(d)}
+        for t, temp, p, w, d in zip(
+            h.get("time", []), h.get("temperature_2m", []), h.get("precipitation_probability", []),
+            h.get("wind_speed_10m", []), h.get("is_day", []),
+        )
+    ]

@@ -6,9 +6,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "motion/react";
 import { toast } from "sonner";
-import { CalendarPlus, Bell, CheckCircle2, ListChecks, Loader2, Mic, MicOff, RotateCcw, ShoppingCart, Sparkles, Square, Volume2, X } from "lucide-react";
-import { apiGet, apiPost, apiUpload, ApiError } from "@/lib/api";
-import type { AppSettings, DistanceUnit, VoiceDraft, VoiceParseIn, VoiceParseOut, VoiceTranscript } from "@/lib/types";
+import { CalendarPlus, Bell, CheckCircle2, ListChecks, Loader2, MapPin, Mic, MicOff, RotateCcw, ShoppingCart, Sparkles, Square, Volume2, X } from "lucide-react";
+import { apiGet, apiPost, apiPut, apiUpload, ApiError } from "@/lib/api";
+import { shortName } from "@/components/AppointmentDialog";
+import type { AppSettings, Appointment, DistanceUnit, GeoPlace, VoiceDraft, VoiceParseIn, VoiceParseOut, VoiceTranscript } from "@/lib/types";
 import {
   browserSpeechSupported,
   listenOnce,
@@ -30,7 +31,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 
-type Phase = "idle" | "listening" | "thinking" | "preview" | "saving" | "briefing";
+type Phase = "idle" | "listening" | "thinking" | "preview" | "saving" | "briefing" | "pin";
 export const WAKE_KEY = "pua:wake";
 export const WAKE_EVENT = "pua:wake-changed";
 
@@ -105,6 +106,11 @@ export function VoiceAssistant() {
     return () => window.removeEventListener(WAKE_EVENT, sync);
   }, []);
 
+  // Pin on create: after a voice appointment with a place is saved, offer its map match.
+  const [pinAppt, setPinAppt] = useState<Appointment | null>(null);
+  const [pinMatches, setPinMatches] = useState<GeoPlace[] | null>(null);
+  const [pinBusy, setPinBusy] = useState(false); // map search unavailable (rate limit / outage)
+
   const freshSignal = () => {
     abortRef.current?.abort();
     abortRef.current = new AbortController();
@@ -134,8 +140,13 @@ export function VoiceAssistant() {
         monthlyTarget: d.monthlyTarget, tracksDistance: d.tracksDistance,
       });
     },
-    onSuccess: (_r, d) => {
-      for (const k of ["overview", "range", "habits", "shopping", "routines"]) qc.invalidateQueries({ queryKey: [k] });
+    onSuccess: (r, d) => {
+      for (const k of ["overview", "range", "habits", "shopping", "routines", "commute-next", "run-plan"]) qc.invalidateQueries({ queryKey: [k] });
+      if (d.kind === "appointment" && d.location.trim() && r && typeof r === "object" && "id" in r) {
+        toast.success(`Appointment added — ${d.title}`);
+        void askPin(r as Appointment);
+        return;
+      }
       const msg =
         d.kind === "shopping"
           ? `Added ${d.items.length} to the shopping list`
@@ -151,6 +162,57 @@ export function VoiceAssistant() {
       toast.error(errText(e));
     },
   });
+
+  async function askPin(appt: Appointment) {
+    setPinAppt(appt);
+    setPinMatches(null);
+    setPinBusy(false);
+    setPhase("pin");
+    let found: GeoPlace[] = [];
+    let busy = false;
+    try {
+      found = (await apiGet<GeoPlace[]>(`/address/search?q=${encodeURIComponent(appt.location)}`)).slice(0, 3);
+    } catch {
+      busy = true;
+    }
+    if (phaseRef.current !== "pin") return;
+    setPinBusy(busy);
+    setPinMatches(found);
+    const talk = speakEnabled();
+    if (!found.length) {
+      if (talk)
+        void speak(busy
+          ? "Saved. The map search is busy right now — you can pin it later in Settings."
+          : "Saved. I couldn't find that place on the map — you can add the address later.");
+      return;
+    }
+    if (talk) await speak(`Saved. Shall I pin ${shortName(found[0].name)} on the map? Say yes, or skip.`, freshSignal());
+    if (!browserSpeechSupported()) return;
+    for (let attempt = 0; attempt < 4 && phaseRef.current === "pin"; attempt++) {
+      let heard = "";
+      try {
+        heard = await listenOnce({ signal: freshSignal() });
+      } catch {
+        return;
+      }
+      if (phaseRef.current !== "pin") return;
+      const t = heard.toLowerCase();
+      if (/\b(skip|no|nope|not now|later|don't|leave it|cancel)\b/.test(t)) return close();
+      if (matchConfirm(heard) === "yes" || /\b(pin|that one|first)\b/.test(t)) return void pinTo(appt, found[0]);
+    }
+  }
+
+  async function pinTo(appt: Appointment, place: GeoPlace) {
+    try {
+      await apiPut<Appointment>(`/appointments/${appt.id}`, { locationLat: place.latitude, locationLon: place.longitude });
+      for (const k of ["overview", "range", "commute-next", "run-plan"]) qc.invalidateQueries({ queryKey: [k] });
+      toast.success(`Pinned ${shortName(place.name)}`);
+      close();
+      if (speakEnabled()) void speak("Pinned.");
+    } catch (e) {
+      toast.error(errText(e));
+    }
+  }
 
   const confirmLoop = useCallback(async () => {
     if (!browserSpeechSupported()) return; // buttons only
@@ -264,6 +326,8 @@ export function VoiceAssistant() {
     setOpen(false);
     setPhase("idle");
     setDraft(null);
+    setPinAppt(null);
+    setPinMatches(null);
   }
 
   // "hey PUA" — background listening only while the dialog is closed.
@@ -309,6 +373,8 @@ export function VoiceAssistant() {
                 ? 'Say "yes" to save or "go back" to try again.'
                 : phase === "briefing"
                   ? "Here's your day."
+                  : phase === "pin"
+                    ? 'Say "yes" to pin the first match, or "skip".'
                   : premium
                   ? 'Just say it naturally — e.g. "lunch with Priya next Thursday at half twelve".'
                   : 'Say e.g. "appointment dentist tomorrow at 3pm", "remind me to call mum Friday at 6pm", "add milk and eggs to the shopping list", "I ran 5k" or "what\'s my day?".'}
@@ -494,6 +560,49 @@ export function VoiceAssistant() {
                       (draft.kind === "shopping" && !draft.items.some((i) => i.trim()))}
                     onClick={() => { abortRef.current?.abort(); stopSpeaking(); setPhase("saving"); save.mutate(draft); }}>
                     {phase === "saving" ? <Loader2 className="size-4 animate-spin" /> : null} Yes, save
+                  </Button>
+                </div>
+              </motion.div>
+            )}
+
+            {phase === "pin" && pinAppt && (
+              <motion.div key="pin" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-3" data-testid="voice-pin">
+                <p className="text-sm">
+                  <span className="font-medium">{pinAppt.title}</span> is saved. Pin
+                  <span className="font-medium"> “{pinAppt.location}”</span> on the map so PUA can work out travel time?
+                </p>
+                {pinMatches === null ? (
+                  <p className="flex items-center gap-2 text-sm text-muted-foreground" data-testid="voice-pin-searching">
+                    <Loader2 className="size-4 animate-spin" /> Looking it up…
+                  </p>
+                ) : pinMatches.length === 0 ? (
+                  <p className="text-sm text-amber-700 dark:text-amber-300" data-testid={pinBusy ? "voice-pin-busy" : "voice-pin-nomatch"}>
+                    {pinBusy
+                      ? "The map search is busy right now — pin it later from Settings → Commute times → Pin appointment places."
+                      : "Couldn't find it on the map — edit the appointment later and use Find with a street or town."}
+                  </p>
+                ) : (
+                  <ul className="space-y-1" data-testid="voice-pin-matches">
+                    {pinMatches.map((p, i) => (
+                      <li key={`${p.latitude},${p.longitude}`}>
+                        <button type="button" onClick={() => void pinTo(pinAppt, p)} data-testid={`voice-pin-match-${i}`}
+                          className={cn(
+                            "flex w-full items-start gap-2 rounded-xl border px-3 py-2 text-left text-sm transition-colors duration-150 hover:bg-accent",
+                            i === 0 && "border-primary/40 bg-primary/5",
+                          )}>
+                          <MapPin className="mt-0.5 size-4 shrink-0 text-primary" />
+                          <span>
+                            <span className="block font-medium">{shortName(p.name)}{i === 0 && <span className="ml-1.5 text-xs font-normal text-primary">say “yes”</span>}</span>
+                            <span className="block text-xs text-muted-foreground">{p.name}</span>
+                          </span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <div className="flex justify-end">
+                  <Button variant="outline" size="sm" onClick={close} data-testid="voice-pin-skip-button">
+                    {pinMatches?.length === 0 ? "Done" : "Skip"}
                   </Button>
                 </div>
               </motion.div>
