@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { FlowerTick } from "@/components/Flower";
+import { Lei } from "@/components/Lei";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion } from "motion/react";
 import { toast } from "sonner";
@@ -97,6 +98,8 @@ export function RoutineCard({
         </div>
       </CardHeader>
       <CardContent className="space-y-3">
+        <Lei streak={routine.streak} id={routine.kind}
+          kinds={routine.kind === "morning" ? ["plumeria", "pink-plumeria", "ilima"] : ["hibiscus", "lehua", "pink-plumeria"]} />
         <div className="flex items-center gap-2">
           <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
             <motion.div

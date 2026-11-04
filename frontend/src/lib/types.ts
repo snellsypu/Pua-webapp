@@ -389,7 +389,9 @@ export interface Person {
 export interface JoinedPlanner extends Person {
   categories: ShareCategory[]; // union of every bouquet of theirs you joined
   shoppingEdit: boolean; // you may tick off / add items on their list
-  bouquets: string[]; // names of their bouquets you're in
+  bouquets: string[]; // names of their bouquets you're in (joined order)
+  bouquetIds: string[]; // same order — the first one's flower colours them on your calendar
+  color: FlowerKind | null; // your own calendar colour pick
 }
 
 // A group you share with — its own code and its own choice of what's shared
@@ -405,6 +407,12 @@ export interface Bouquet {
 export interface SharingState {
   bouquets: Bouquet[];
   joined: JoinedPlanner[];
+  joinedOwnerId: string | null; // set by POST /sharing/join
+}
+
+export type FlowerKind = "plumeria" | "pink-plumeria" | "hibiscus" | "ilima" | "lehua";
+export interface FriendColorIn {
+  color: FlowerKind | null;
 }
 
 export interface BouquetUpdate {
@@ -431,6 +439,8 @@ export interface SharedPlanner {
 export interface FriendCalendar {
   owner: Person;
   appointments: Appointment[];
+  bouquetId: string | null; // default colour = this bouquet's flower
+  color: FlowerKind | null; // your pick overrides it
 }
 
 // Mirrors OnboardIn in backend/models/auth.py

@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { motion } from "motion/react";
 import { AlertCircle, ListChecks, Mic, Sunrise } from "lucide-react";
-import { PuaLogo } from "@/components/Flower";
+import { Flower, PuaLogo } from "@/components/Flower";
 import { AUTH_ERROR_KEY, signIn } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -20,6 +20,7 @@ function GoogleMark() {
 
 export default function SignIn() {
   const [error] = useState(() => sessionStorage.getItem(AUTH_ERROR_KEY));
+  const invited = window.location.pathname.startsWith("/join/");
   return (
     <div className="relative grid min-h-dvh place-items-center overflow-hidden px-5 py-10">
       <div className="pointer-events-none absolute -left-32 -top-32 size-[28rem] rounded-full bg-amber-400/20 blur-3xl" />
@@ -46,6 +47,11 @@ export default function SignIn() {
           <li className="flex items-center gap-2"><Mic className="size-4 text-primary" /> &ldquo;Hey PUA&rdquo; voice control</li>
         </ul>
 
+        {invited && (
+          <p className="mt-5 flex items-center gap-2.5 rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-sm" data-testid="signin-invite">
+            <Flower kind="hibiscus" className="size-6 shrink-0" /> You&apos;ve been invited to a bouquet — sign in and you&apos;ll join it straight away.
+          </p>
+        )}
         {error && (
           <p className="mt-5 flex items-start gap-2 rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-sm text-rose-700 dark:text-rose-300" data-testid="signin-error">
             <AlertCircle className="mt-0.5 size-4 shrink-0" /> {error}

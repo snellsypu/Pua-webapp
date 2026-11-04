@@ -3,7 +3,9 @@
 import { useId } from "react";
 import { cn } from "@/lib/utils";
 
-export type FlowerKind = "plumeria" | "pink-plumeria" | "hibiscus" | "ilima" | "lehua";
+import type { FlowerKind } from "@/lib/types";
+
+export type { FlowerKind };
 export const FLOWER_KINDS: FlowerKind[] = ["plumeria", "hibiscus", "pink-plumeria", "ilima", "lehua"];
 
 /** Same key → same flower, so a habit or step always blooms the same way. */
@@ -13,6 +15,15 @@ export function flowerFor(key: string | undefined | null): FlowerKind {
   for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) >>> 0;
   return FLOWER_KINDS[h % FLOWER_KINDS.length];
 }
+
+/** Calendar colour per flower — used for friends' appointment layers. */
+export const FLOWER_TONES: Record<FlowerKind, { label: string; dot: string; bar: string; chip: string }> = {
+  plumeria: { label: "Plumeria", dot: "bg-amber-400", bar: "border-l-amber-400", chip: "bg-amber-400/20 text-amber-800 dark:text-amber-300" },
+  "pink-plumeria": { label: "Pink plumeria", dot: "bg-pink-500", bar: "border-l-pink-500", chip: "bg-pink-500/15 text-pink-800 dark:text-pink-300" },
+  hibiscus: { label: "Hibiscus", dot: "bg-rose-600", bar: "border-l-rose-600", chip: "bg-rose-600/15 text-rose-800 dark:text-rose-300" },
+  ilima: { label: "ʻIlima", dot: "bg-orange-500", bar: "border-l-orange-500", chip: "bg-orange-500/15 text-orange-800 dark:text-orange-300" },
+  lehua: { label: "Lehua", dot: "bg-red-700", bar: "border-l-red-700", chip: "bg-red-700/15 text-red-800 dark:text-red-300" },
+};
 
 const ROT = [0, 72, 144, 216, 288];
 // A plumeria petal: a pinwheel teardrop pointing up, leaning right so the five overlap.

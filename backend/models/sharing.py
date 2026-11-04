@@ -24,3 +24,5 @@ class FriendCalendar(BaseModel):
     """One friend's shared appointments for the calendar overlay (private ones masked)."""
     owner: Person
     appointments: list[Appointment]
+    bouquetId: str | None = None  # first of their bouquets you joined (default colour)
+    color: str | None = None  # your pick (a flower kind), overrides the bouquet colour

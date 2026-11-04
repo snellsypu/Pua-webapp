@@ -6,7 +6,7 @@ import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "motion/react";
 import { toast } from "sonner";
-import { Copy, Eye, LogOut, Pencil, Plus, RefreshCw, Trash2, UserMinus, UserPlus } from "lucide-react";
+import { Copy, Eye, Link2, LogOut, Pencil, Plus, RefreshCw, Trash2, UserMinus, UserPlus } from "lucide-react";
 import { apiDelete, apiGet, apiPost, apiPut, ApiError } from "@/lib/api";
 import type { Bouquet, BouquetUpdate, ShareCategory, SharingState } from "@/lib/types";
 import { Avatar } from "@/components/AccountButton";
@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import { FriendColorPicker } from "@/components/FriendColorPicker";
 
 export const SHARE_LABELS: Record<ShareCategory, string> = {
   appointments: "Appointments", reminders: "Reminders", habits: "Habits",
@@ -22,6 +23,7 @@ export const SHARE_LABELS: Record<ShareCategory, string> = {
 };
 const ALL = Object.keys(SHARE_LABELS) as ShareCategory[];
 const fmtCode = (c: string) => `${c.slice(0, 4)}-${c.slice(4)}`;
+export const inviteLink = (code: string) => `${window.location.origin}/join/${fmtCode(code)}`;
 
 const errText = (e: unknown) =>
   e instanceof ApiError && e.body && typeof e.body === "object" && "detail" in e.body
@@ -59,6 +61,16 @@ function BouquetCard({ b }: { b: Bouquet }) {
     catch { toast.error("Couldn't copy — select the code and copy it"); }
   };
   const tid = `bouquet-${b.id}`;
+  const invite = async () => {
+    const url = inviteLink(b.code);
+    const text = `Join my ${b.name} bouquet on PUA`;
+    if (navigator.share) {
+      try { await navigator.share({ title: "PUA bouquet invite", text, url }); return; }
+      catch (e) { if (e instanceof DOMException && e.name === "AbortError") return; }
+    }
+    try { await navigator.clipboard.writeText(url); toast.success("Invite link copied — send it to anyone you want in this bouquet"); }
+    catch { toast.error("Couldn't copy the link"); }
+  };
 
   return (
     <motion.div layout initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: 0.97 }}>
@@ -82,6 +94,7 @@ function BouquetCard({ b }: { b: Bouquet }) {
           </div>
           <div className="flex items-center gap-1.5">
             <span className="select-all rounded-xl border bg-muted/40 px-3 py-1.5 font-mono text-base font-bold tracking-[0.2em]" data-testid={`${tid}-code`}>{fmtCode(b.code)}</span>
+            <Button size="sm" onClick={() => void invite()} data-testid={`${tid}-invite`} title={inviteLink(b.code)}><Link2 className="size-4" /> Invite link</Button>
             <Button size="icon-sm" variant="outline" aria-label="Copy code" onClick={() => void copy()} data-testid={`${tid}-copy`}><Copy className="size-4" /></Button>
             <Button size="icon-sm" variant="outline" aria-label="New code" title="New code — members stay" onClick={() => regen.mutate(undefined)} disabled={regen.isPending}
               data-testid={`${tid}-regenerate`}><RefreshCw className="size-4" /></Button>
@@ -195,7 +208,7 @@ export default function Sharing() {
       <Card data-testid="joined-card">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 font-heading"><UserPlus className="size-4" /> Planners shared with you</CardTitle>
-          <CardDescription>Enter a bouquet code to join it. Joining another bouquet keeps you in the ones you&apos;re already in.</CardDescription>
+          <CardDescription>Open an invite link or enter a bouquet code to join it. Joining another bouquet keeps you in the ones you&apos;re already in.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); if (code.trim()) join.mutate(code.trim()); }}>
@@ -210,14 +223,19 @@ export default function Sharing() {
                   <Avatar name={p.name} picture={p.picture} />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm font-medium">{p.name}</span>
-                    <span className="block truncate text-xs text-muted-foreground" data-testid={`joined-bouquets-${p.user_id}`}>
-                      {p.bouquets.map((n) => `🌺 ${n}`).join("  ")}
+                    <span className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground" data-testid={`joined-bouquets-${p.user_id}`}>
+                      {p.bouquets.map((n, i) => (
+                        <span key={p.bouquetIds[i] ?? n} className="inline-flex items-center gap-1"><Flower kind={flowerFor(p.bouquetIds[i])} className="size-3.5" />{n}</span>
+                      ))}
                     </span>
                     <span className="block truncate text-xs text-muted-foreground">
                       {p.categories.length ? p.categories.map((c) => SHARE_LABELS[c]).join(" · ") : "Nothing shared yet"}
                       {p.shoppingEdit && " · you can edit shopping"}
                     </span>
                   </span>
+                  {p.categories.includes("appointments") && (
+                    <FriendColorPicker ownerId={p.user_id} name={p.name.split(" ")[0]} color={p.color} bouquetId={p.bouquetIds[0]} bouquetName={p.bouquets[0]} />
+                  )}
                   <Link to={`/shared/${p.user_id}`} className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-primary px-3 text-sm font-medium text-primary-foreground transition-opacity duration-150 hover:opacity-90"
                     data-testid={`joined-open-${p.user_id}`}><Eye className="size-4" /> View</Link>
                   <Button variant="ghost" size="icon-sm" aria-label="Leave" title="Leave all their bouquets" onClick={() => leave.mutate(p.user_id)} disabled={leave.isPending}

@@ -250,6 +250,15 @@ Emergent-managed Google sign-in (lib/auth.py, routers/auth.py, frontend lib/auth
   DELETE /joined/{ownerId} (leave all their bouquets); GET /planner/{ownerId} snapshot (404
   without membership): appointments/reminders today+13 d, habits, routines, meals this week,
   shopping — only shared categories (others null).
+- **Invite links**: `/join/ABCD-2345` (Bouquet card "Invite link" → share sheet or copy).
+  Signed out → SignIn shows an invite note; Google redirect returns to the same path; new
+  accounts onboard first; then JoinBouquet page POSTs /sharing/join (response carries
+  `joinedOwnerId`) and opens /shared/{owner}.
+- **Friend calendar colours**: a friend's appointments use the flower colour of the first of
+  their bouquets you joined (`flowerFor(bouquetId)`, FLOWER_TONES in Flower.tsx), or your pick:
+  PUT /sharing/friends/{ownerId}/color {color: flower kind | null} → stored on your user doc
+  `friendColors`. Picker (FriendColorPicker) on the calendar legend and the Bouquets "Planners
+  shared with you" list. FriendCalendar/JoinedPlanner carry bouquetId(s) + color.
 - **Shared shopping edits**: per-bouquet `shoppingEdit` (default true) — when any of the
   viewer's bouquets shares shopping with edits on, viewers may POST
   /sharing/planner/{ownerId}/shopping {name} and PATCH .../shopping/{itemId} {checked}
@@ -277,4 +286,9 @@ Emergent-managed Google sign-in (lib/auth.py, routers/auth.py, frontend lib/auth
 - Every tick blooms: ui/checkbox.tsx (round bud → flower, kind from id/data-testid), habit
   check buttons, shared-planner habits, onboarding packs, routine "All done", theme choice.
 - Logo `PuaLogo`: luau plumeria above the word PUA (header, sign-in); favicon.svg plumeria.
+  Home-screen icons (public/icon-192.png, icon-512.png also maskable, apple-touch-icon.png,
+  favicon PNG/ICO) are the plumeria-over-PUA artwork, rendered from SVG with headless Chrome.
+- **Lei streaks** (components/Lei.tsx, in each RoutineCard): one flower per day of the
+  routine's current streak, strung along a garland in rounds of 7 slots (max 28 shown, then
+  "Full lei!"); morning = plumeria/pink plumeria/ʻilima, bedtime = hibiscus/lehua/pink.
   Nav item "Bouquets" (route /sharing).

@@ -34,15 +34,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
+import { FLOWER_TONES } from "@/components/Flower";
+import { FriendColorPicker, friendFlower } from "@/components/FriendColorPicker";
 
-// One colour per friend layer (dot, chip and bar tones).
-const FRIEND_TONES = [
-  { dot: "bg-amber-500", bar: "border-l-amber-500", chip: "bg-amber-500/15 text-amber-800 dark:text-amber-300" },
-  { dot: "bg-sky-500", bar: "border-l-sky-500", chip: "bg-sky-500/15 text-sky-800 dark:text-sky-300" },
-  { dot: "bg-rose-500", bar: "border-l-rose-500", chip: "bg-rose-500/15 text-rose-800 dark:text-rose-300" },
-  { dot: "bg-teal-500", bar: "border-l-teal-500", chip: "bg-teal-500/15 text-teal-800 dark:text-teal-300" },
-  { dot: "bg-fuchsia-500", bar: "border-l-fuchsia-500", chip: "bg-fuchsia-500/15 text-fuchsia-800 dark:text-fuchsia-300" },
-];
 const LAYER_KEY = "pua:friends-layer";
 
 export default function Calendar() {
@@ -73,7 +67,7 @@ export default function Calendar() {
     queryFn: () => apiGet<FriendCalendar[]>(`/sharing/calendar?from=${from}&to=${to}`),
   });
   const friendLayers = useMemo(
-    () => (friends.data ?? []).map((f, i) => ({ ...f, tone: FRIEND_TONES[i % FRIEND_TONES.length] })),
+    () => (friends.data ?? []).map((f) => ({ ...f, tone: FLOWER_TONES[friendFlower(f.color, f.bouquetId)] })),
     [friends.data],
   );
   const toggleFriends = () => {
@@ -217,9 +211,8 @@ export default function Calendar() {
         {friendLayers.length > 0 && (
           <div className="flex flex-wrap items-center gap-2" data-testid="calendar-friends-legend">
             {showFriends && friendLayers.map((f) => (
-              <span key={f.owner.user_id} className={cn("inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium", f.tone.chip)}
-                data-testid={`calendar-friend-chip-${f.owner.user_id}`}>
-                <span className={cn("size-2 rounded-full", f.tone.dot)} /> {f.owner.name.split(" ")[0]}
+              <span key={f.owner.user_id} data-testid={`calendar-friend-chip-${f.owner.user_id}`}>
+                <FriendColorPicker ownerId={f.owner.user_id} name={f.owner.name.split(" ")[0]} color={f.color} bouquetId={f.bouquetId} />
               </span>
             ))}
             <Button variant={showFriends ? "secondary" : "outline"} size="xs" onClick={toggleFriends} aria-pressed={showFriends}

@@ -16,7 +16,9 @@ from fastapi import APIRouter, HTTPException, Query, Request
 from lib.auth import new_friend_code
 from lib.dates import today_iso
 from lib.db import current_owner, raw_db
-from models.auth import Bouquet, BouquetCreate, BouquetUpdate, JoinedPlanner, JoinIn, Person, SharingState
+from models.auth import (
+    Bouquet, BouquetCreate, BouquetUpdate, FriendColorIn, JoinedPlanner, JoinIn, Person, SharingState,
+)
 from models.planner import Appointment, ShoppingCreate, ShoppingItem, ShoppingUpdate
 from models.sharing import FriendCalendar, SharedPlanner
 
@@ -40,17 +42,23 @@ async def _unique_code() -> str:
             return code
 
 
-async def _access(owner_id: str, viewer_id: str) -> tuple[set[str], bool, list[str]]:
-    """(categories, shoppingEdit, bouquet names) the viewer has on owner's planner."""
-    ids = [m["bouquetId"] async for m in raw_db.bouquet_members.find({"ownerId": owner_id, "viewerId": viewer_id})]
+async def _access(owner_id: str, viewer_id: str) -> tuple[set[str], bool, list[dict]]:
+    """(categories, shoppingEdit, bouquets in joined order) the viewer has on owner's planner."""
+    ids = [m["bouquetId"] async for m in
+           raw_db.bouquet_members.find({"ownerId": owner_id, "viewerId": viewer_id}).sort("joinedAt", 1)]
+    by_id = {b["id"]: b async for b in raw_db.bouquets.find({"id": {"$in": ids}})}
+    bouquets = [by_id[i] for i in ids if i in by_id]
     cats: set[str] = set()
     edit = False
-    names: list[str] = []
-    async for b in raw_db.bouquets.find({"id": {"$in": ids}}).sort("createdAt", 1):
+    for b in bouquets:
         cats |= set(b.get("categories", []))
         edit = edit or ("shopping" in b.get("categories", []) and b.get("shoppingEdit", True))
-        names.append(b["name"])
-    return cats, edit, names
+    return cats, edit, bouquets
+
+
+async def _colors(viewer_id: str) -> dict[str, str]:
+    u = await raw_db.users.find_one({"user_id": viewer_id}, {"_id": 0, "friendColors": 1}) or {}
+    return u.get("friendColors", {})
 
 
 async def _state(uid: str) -> SharingState:
@@ -62,9 +70,12 @@ async def _state(uid: str) -> SharingState:
                                 shoppingEdit=b.get("shoppingEdit", True), members=members))
     owner_ids = list(dict.fromkeys([m["ownerId"] async for m in raw_db.bouquet_members.find({"viewerId": uid})]))
     joined: list[JoinedPlanner] = []
+    colors = await _colors(uid)
     async for u in raw_db.users.find({"user_id": {"$in": owner_ids}}, {"_id": 0}).sort("name", 1):
-        cats, edit, names = await _access(u["user_id"], uid)
-        joined.append(JoinedPlanner(**_person(u).model_dump(), categories=sorted(cats), shoppingEdit=edit, bouquets=names))
+        cats, edit, bqs = await _access(u["user_id"], uid)
+        joined.append(JoinedPlanner(**_person(u).model_dump(), categories=sorted(cats), shoppingEdit=edit,
+                                    bouquets=[b["name"] for b in bqs], bouquetIds=[b["id"] for b in bqs],
+                                    color=colors.get(u["user_id"])))
     return SharingState(bouquets=bouquets, joined=joined)
 
 
@@ -146,6 +157,20 @@ async def join(input: JoinIn, request: Request):
         {"bouquetId": b["id"], "viewerId": uid},
         {"$setOnInsert": {"ownerId": b["ownerId"], "joinedAt": datetime.now(timezone.utc)}}, upsert=True,
     )
+    out = await _state(uid)
+    out.joinedOwnerId = b["ownerId"]
+    return out
+
+
+@router.put("/friends/{owner_id}/color", response_model=SharingState)
+async def set_friend_color(owner_id: str, input: FriendColorIn, request: Request):
+    """Your calendar colour for a friend's planner (null = their bouquet's colour)."""
+    uid = _uid(request)
+    if not await raw_db.bouquet_members.find_one({"ownerId": owner_id, "viewerId": uid}):
+        raise HTTPException(status_code=404, detail="You don't have access to that planner")
+    key = f"friendColors.{owner_id}"
+    upd = {"$set": {key: input.color}} if input.color else {"$unset": {key: ""}}
+    await raw_db.users.update_one({"user_id": uid}, upd)
     return await _state(uid)
 
 
@@ -208,8 +233,9 @@ async def friends_calendar(request: Request, from_: str = Query(alias="from"), t
     uid = _uid(request)
     owner_ids = list(dict.fromkeys([m["ownerId"] async for m in raw_db.bouquet_members.find({"viewerId": uid})]))
     out: list[FriendCalendar] = []
+    colors = await _colors(uid)
     async for owner in raw_db.users.find({"user_id": {"$in": owner_ids}}, {"_id": 0}).sort("name", 1):
-        cats, _, _ = await _access(owner["user_id"], uid)
+        cats, _, bqs = await _access(owner["user_id"], uid)
         if "appointments" not in cats:
             continue
         token = current_owner.set(owner["user_id"])
@@ -217,7 +243,8 @@ async def friends_calendar(request: Request, from_: str = Query(alias="from"), t
             appts = await appointments.list_appointments(from_=from_, to=to)
         finally:
             current_owner.reset(token)
-        out.append(FriendCalendar(owner=_person(owner), appointments=[_mask(a) for a in appts]))
+        out.append(FriendCalendar(owner=_person(owner), appointments=[_mask(a) for a in appts],
+                                  bouquetId=bqs[0]["id"] if bqs else None, color=colors.get(owner["user_id"])))
     return out
 
 
