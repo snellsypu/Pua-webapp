@@ -56,6 +56,18 @@ class AppSettings(BaseModel):
     distanceUnit: str = "km"
     timezone: str = "UTC"  # IANA zone from the browser; drives routine notification times
     premiumVoice: bool = False  # AI transcription + natural-language voice (Emergent LLM key)
+    reviewTime: str = "18:00"  # overview switches from today's briefing to tomorrow's review
+    wakeTime: str = "07:00"  # wake-up notification time (settings.timezone)
+    wakeNotify: bool = False
+
+
+class DayPart(BaseModel):
+    """Which overview to show right now, decided on the server in settings.timezone."""
+
+    part: str  # morning (today's briefing) | evening (tomorrow's review)
+    localTime: str  # HH:MM now
+    date: str  # server-anchored today
+    reviewTime: str
 
 
 class SettingsUpdate(BaseModel):
@@ -66,6 +78,16 @@ class SettingsUpdate(BaseModel):
     distanceUnit: str | None = None
     timezone: str | None = None
     premiumVoice: bool | None = None
+    reviewTime: str | None = None
+    wakeTime: str | None = None
+    wakeNotify: bool | None = None
+
+    @field_validator("reviewTime", "wakeTime")
+    @classmethod
+    def _check_hhmm(cls, v: str | None) -> str | None:
+        if v is not None and not re.match(r"^([01]\d|2[0-3]):[0-5]\d$", v):
+            raise ValueError("time must be HH:MM")
+        return v
 
     @field_validator("units")
     @classmethod

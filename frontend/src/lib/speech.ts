@@ -191,9 +191,9 @@ export function stopSpeaking() {
   if (speechOutputSupported()) window.speechSynthesis.cancel();
 }
 
-/** Read text aloud; resolves when finished (or aborted / unsupported). */
-export function speak(text: string, signal?: AbortSignal): Promise<void> {
-  if (!speechOutputSupported() || !text) return Promise.resolve();
+/** Read text aloud; resolves true when finished, false if blocked/failed/unsupported. */
+export function speak(text: string, signal?: AbortSignal): Promise<boolean> {
+  if (!speechOutputSupported() || !text) return Promise.resolve(false);
   return new Promise((resolve) => {
     const synth = window.speechSynthesis;
     synth.cancel();
@@ -203,21 +203,26 @@ export function speak(text: string, signal?: AbortSignal): Promise<void> {
     const voice = synth.getVoices().find((v) => v.lang === u.lang) ?? synth.getVoices().find((v) => v.lang.startsWith(u.lang.slice(0, 2)));
     if (voice) u.voice = voice;
     let settled = false;
-    const done = () => {
+    const done = (ok = true) => {
       if (!settled) {
         settled = true;
         clearTimeout(guard);
-        resolve();
+        resolve(ok);
       }
     };
     // Some engines never fire onend — cap at a generous reading time.
-    const guard = setTimeout(done, 2000 + text.length * 90);
-    u.onend = done;
-    u.onerror = done;
+    const guard = setTimeout(() => done(), 2000 + text.length * 90);
+    u.onend = () => done();
+    // "not-allowed" = the browser wants a tap first (opened by a link/routine, no gesture yet)
+    u.onerror = (e) => done(e.error === "interrupted" || e.error === "canceled");
     signal?.addEventListener("abort", () => {
       synth.cancel();
       done();
     });
     synth.speak(u);
+    // Some browsers silently drop un-gestured speech — no events at all.
+    setTimeout(() => {
+      if (!synth.speaking && !synth.pending) done(false);
+    }, 1500);
   });
 }

@@ -1,6 +1,6 @@
 """Push subscription endpoints + the platform-cron routine notifier.
 
-The cron (.emergent/crons.yml, every 15 min) POSTs /api/cron/routines. For each
+The cron (.emergent/crons.yml, every 5 min) also sends the wake-up push, and POSTs /api/cron/routines. For each
 routine with notifications on, if its time (in settings.timezone) passed within
 the last hour and it hasn't been notified today, send one push — unless the
 routine is already complete."""
@@ -62,6 +62,27 @@ async def send_test():
     )
 
 
+async def _maybe_wake(settings: dict, now_local: datetime, local_date: str) -> None:
+    """Wake-up push at settings.wakeTime; tapping it opens PUA, which reads the morning out."""
+    if not settings.get("wakeNotify") or settings.get("lastWakeNotifiedDate") == local_date:
+        return
+    hh, mm = (int(p) for p in (settings.get("wakeTime") or "07:00").split(":"))
+    scheduled = now_local.replace(hour=hh, minute=mm, second=0, microsecond=0)
+    if not (timedelta(0) <= now_local - scheduled < WINDOW):
+        return
+    claimed = await db.settings.update_one(
+        {"id": "app", "lastWakeNotifiedDate": {"$ne": local_date}},
+        {"$set": {"lastWakeNotifiedDate": local_date}},
+    )
+    if not claimed.modified_count:
+        return
+    result = await push_lib.send_to_all(
+        "Good morning ☀️", "Tap and PUA will read today's weather and your first routine step.",
+        url="/overview?wake=1", tag="wake-up",
+    )
+    logger.info("wake push: %s", result.model_dump())
+
+
 async def run_routine_notifications() -> None:
     settings = await db.settings.find_one({"id": "app"}) or {}
     try:
@@ -70,6 +91,7 @@ async def run_routine_notifications() -> None:
         tz = ZoneInfo("UTC")
     now_local = datetime.now(tz)
     local_date = now_local.strftime("%Y-%m-%d")
+    await _maybe_wake(settings, now_local, local_date)
     for doc in await ensure_routines():
         if not doc.get("notify") or doc.get("lastNotifiedDate") == local_date:
             continue
@@ -92,7 +114,7 @@ async def run_routine_notifications() -> None:
         result = await push_lib.send_to_all(
             state.title,
             body,
-            url="/morning" if doc["kind"] == "morning" else "/evening",
+            url="/overview?view=today" if doc["kind"] == "morning" else "/overview?view=tomorrow",
             tag=f"routine-{doc['kind']}",
         )
         logger.info("routine push %s: %s", doc["kind"], result.model_dump())

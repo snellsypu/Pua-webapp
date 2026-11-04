@@ -46,10 +46,29 @@ tomorrow's preview). Public URL: https://daily-loop-8--68ipsq2d.preview.emergent
   28-day heat strip per habit.
 - `/planner` — day navigation + date picker; 4 meal slots with inline edit; meal → shopping
   list button; full shopping list management.
-- `/morning` — amber briefing: hero weather + hourly, umbrella tip when precip ≥ 40 %,
-  schedule, habit intentions, reminders (quick add), meals.
-- `/evening` — violet review: scorecard badges, today recap, tomorrow preview (weather,
-  appointments, meals, reminders + quick add for tomorrow).
+- `/overview` (pages/Overview.tsx) — ONE overview that follows the clock: `GET /api/daypart`
+  → {part morning|evening, localTime, date, reviewTime} in settings.timezone; part = evening
+  once localTime ≥ `settings.reviewTime` (default 18:00, editable in Settings → Overview &
+  wake-up; refetched every minute). Tabs "Today's briefing" / "Tomorrow's review";
+  `?view=today|tomorrow` pins a view. `/morning` and `/evening` redirect to the pinned views.
+  Header nav icon + Home/widget link swap sunrise/moon by daypart.
+  - Today view (pages/Morning.tsx): amber briefing: hero weather + hourly, umbrella tip when
+    precip ≥ 40 %, schedule, morning routine, habit intentions, reminders (quick add), meals.
+  - Tomorrow view (pages/Evening.tsx): violet review: scorecard badges, bedtime routine, today
+    recap, tomorrow preview (weather, appointments, meals, reminders + quick add).
+- **Wake-up read** (`/overview?wake=1`, components/WakeBanner.tsx): `GET /api/voice/wake` →
+  {text} = "Good morning! <home weather>. First/Next step of your morning routine: <first open
+  step>." Shown in a banner and read aloud via speechSynthesis; if the browser blocks un-tapped
+  speech, a "Tap to hear your morning" button. Three triggers, once per day (localStorage
+  `pua:last-wake`):
+  1. Wake link (Settings shows/copies it) for phone automations.
+  2. "Read on first open" (device-local `pua:wake-first-open`): the first app open within 3 h
+     after `settings.wakeTime` redirects to ?wake=1 — for Samsung Modes & Routines
+     "Selected alarm dismissed → Open an app → PUA" (PWA on home screen).
+  3. Wake-up push: `settings.wakeNotify` + `wakeTime` (default 07:00, off); sent by the same
+     cron (now every 5 min) via `_maybe_wake`, claimed per day with
+     `settings.lastWakeNotifiedDate`; tap opens /overview?wake=1. Routine pushes now open
+     /overview?view=today|tomorrow.
 - `/settings` — home city search/detect, light/dark/system theme (next-themes), units.
 - **Create FAB** (`components/CreateFab.tsx`, mounted in AppShell on every page) — bottom-right
   "+" opens a menu: Reminder / Habit / Appointment, each opening its dialog with the date
@@ -78,7 +97,7 @@ tomorrow's preview). Public URL: https://daily-loop-8--68ipsq2d.preview.emergent
   each with editable steps (ids preserved on edit so today's ticks survive), daily-reset checks in
   `routine_checks` (kind+date, doneStepIds, complete), and a completion streak (days where every
   step was ticked; reuses habits `_streaks`). `POST /routines/{kind}/steps/{stepId}/toggle`,
-  `PUT /routines/{kind}` {time?, notify?, steps?}. Cards: Today (both), /morning, /evening.
+  `PUT /routines/{kind}` {time?, notify?, steps?}. Cards: Today (both), overview today view (morning), tomorrow view (bedtime).
 - **Push notifications (Web Push/VAPID, pywebpush 2.5.0)** — `public/sw.js` shows pushes +
   focuses/opens the app on tap. Settings → Routine notifications: enable (permission from a
   click → subscribe → `POST /api/push/subscribe`; also saves the browser timezone to

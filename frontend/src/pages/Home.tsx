@@ -40,6 +40,7 @@ import {
 } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
+import { useDayPart } from "@/lib/useDayPart";
 
 export default function Home() {
   const overview = useQuery({
@@ -56,6 +57,7 @@ export default function Home() {
     queryFn: () => apiGet<RoutineState[]>("/routines"),
   });
   const weather = useWeather();
+  const evening = useDayPart().data?.part === "evening";
   const qc = useQueryClient();
   const [widget, setWidget] = useState(() => localStorage.getItem("pua:widget") === "1");
   const [apptOpen, setApptOpen] = useState(false);
@@ -164,11 +166,9 @@ export default function Home() {
               </div>
             </div>
             <div className="flex gap-2 pt-1">
-              <Link to="/morning" className={cn(buttonVariants({ variant: "outline", size: "sm" }), "flex-1")} data-testid="widget-morning-link">
-                <Sunrise className="size-4" /> Morning
-              </Link>
-              <Link to="/evening" className={cn(buttonVariants({ variant: "outline", size: "sm" }), "flex-1")} data-testid="widget-evening-link">
-                <MoonStar className="size-4" /> Evening
+              <Link to="/overview" className={cn(buttonVariants({ variant: "outline", size: "sm" }), "flex-1")} data-testid="widget-overview-link">
+                {evening ? <MoonStar className="size-4" /> : <Sunrise className="size-4" />}
+                {evening ? "Tomorrow's review" : "Today's briefing"}
               </Link>
             </div>
           </CardContent>
@@ -224,11 +224,12 @@ export default function Home() {
             </CardTitle>
           </CardHeader>
           <CardContent className="flex flex-wrap gap-2">
-            <Link to="/morning" className={buttonVariants({ variant: "outline", size: "sm" })} data-testid="home-morning-link">
-              <Sunrise className="size-4 text-amber-600" /> Morning briefing
-            </Link>
-            <Link to="/evening" className={buttonVariants({ variant: "outline", size: "sm" })} data-testid="home-evening-link">
-              <MoonStar className="size-4 text-violet-600" /> Evening review
+            <Link to="/overview" className={buttonVariants({ variant: "outline", size: "sm" })} data-testid="home-overview-link">
+              {evening ? (
+                <><MoonStar className="size-4 text-violet-600" /> Tomorrow&apos;s review</>
+              ) : (
+                <><Sunrise className="size-4 text-amber-600" /> Today&apos;s briefing</>
+              )}
             </Link>
           </CardContent>
         </Card>

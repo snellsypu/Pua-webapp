@@ -18,6 +18,17 @@ export interface AppSettings {
   distanceUnit: DistanceUnit;
   timezone: string;
   premiumVoice: boolean;
+  reviewTime: string; // HH:MM — overview flips to tomorrow's review
+  wakeTime: string; // HH:MM — wake-up notification
+  wakeNotify: boolean;
+}
+
+// Mirrors DayPart in backend/models/planner.py
+export interface DayPart {
+  part: "morning" | "evening";
+  localTime: string;
+  date: string;
+  reviewTime: string;
 }
 
 // Partial PUT — only the fields sent change. home: null clears the home city.
@@ -27,6 +38,9 @@ export interface SettingsUpdate {
   distanceUnit?: DistanceUnit;
   timezone?: string;
   premiumVoice?: boolean;
+  reviewTime?: string;
+  wakeTime?: string;
+  wakeNotify?: boolean;
 }
 
 export interface Appointment {

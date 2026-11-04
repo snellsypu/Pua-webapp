@@ -33,6 +33,9 @@ def _out(doc: dict) -> AppSettings:
         distanceUnit=doc.get("distanceUnit", "km"),
         timezone=doc.get("timezone", "UTC"),
         premiumVoice=bool(doc.get("premiumVoice", False)),
+        reviewTime=doc.get("reviewTime", "18:00"),
+        wakeTime=doc.get("wakeTime", "07:00"),
+        wakeNotify=bool(doc.get("wakeNotify", False)),
     )
 
 

@@ -3,7 +3,8 @@
 it reads the date back from these responses."""
 
 import asyncio
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
+from zoneinfo import ZoneInfo
 
 from pymongo import ASCENDING
 from fastapi import APIRouter, HTTPException, Query
@@ -14,6 +15,7 @@ from models.planner import (
     MEAL_SLOTS,
     Appointment,
     DayContext,
+    DayPart,
     HabitCompletion,
     Meal,
     RangeBundle,
@@ -61,6 +63,19 @@ async def get_overview(offset: int = Query(default=0, ge=-31, le=366)):
         _appointments(target, target), _meals(target, target), _reminders(target, target)
     )
     return DayContext(date=target, appointments=appointments, meals=meals, reminders=reminders)
+
+
+@router.get("/daypart", response_model=DayPart)
+async def get_daypart():
+    """Morning briefing until settings.reviewTime (default 18:00), then tomorrow's review."""
+    settings = await db.settings.find_one({"id": "app"}) or {}
+    try:
+        now = datetime.now(ZoneInfo(settings.get("timezone") or "UTC"))
+    except Exception:
+        now = datetime.now(ZoneInfo("UTC"))
+    review = settings.get("reviewTime") or "18:00"
+    local = now.strftime("%H:%M")
+    return DayPart(part="evening" if local >= review else "morning", localTime=local, date=today_iso(), reviewTime=review)
 
 
 @router.get("/range", response_model=RangeBundle)

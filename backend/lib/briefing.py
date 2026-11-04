@@ -44,6 +44,46 @@ def _plural(n: int, word: str) -> str:
     return f"{n} {word}{'' if n == 1 else 's'}"
 
 
+async def _weather_line(settings: dict, today: str) -> str:
+    home = settings.get("home")
+    if not home:
+        return "Set a home city in Settings and I'll include the weather."
+    try:
+        wb = await weather_lib.get_bundle(home["latitude"], home["longitude"], settings.get("units", "celsius"))
+    except Exception:
+        return "I couldn't reach the weather service just now."
+    day = next((x for x in wb.days if x.date == today), wb.days[0] if wb.days else None)
+    line = (f"In {home['name']} it's {round(wb.now.temperature)} degrees with "
+            f"{WEATHER_WORDS.get(wb.now.code, 'mixed weather')}")
+    if day:
+        line += f", heading for a high of {round(day.tempMax)}"
+        if day.precipProb >= 20:
+            line += f" and a {round(day.precipProb)} percent chance of rain"
+            if day.precipProb >= 50:
+                line += ", so take an umbrella"
+    return line + "."
+
+
+async def build_wake() -> str:
+    """Read after the wake-up alarm: the morning weather + the first open morning-routine step."""
+    settings = await db.settings.find_one({"id": "app"}) or {}
+    today = today_iso()
+    out = ["Good morning!", await _weather_line(settings, today)]
+    routine = await db.routines.find_one({"kind": "morning"}) or {}
+    steps = routine.get("steps", [])
+    check = await db.routine_checks.find_one({"kind": "morning", "date": today}) or {}
+    open_steps = [s for s in steps if s["id"] not in check.get("doneStepIds", [])]
+    if not steps:
+        out.append("Your morning routine has no steps yet.")
+    elif not open_steps:
+        out.append("Your morning routine is already done. Nice!")
+    elif len(open_steps) == len(steps):
+        out.append(f"First step of your morning routine: {open_steps[0]['text']}.")
+    else:
+        out.append(f"Next step of your morning routine: {open_steps[0]['text']}.")
+    return " ".join(out)
+
+
 async def build_briefing() -> str:
     settings = await db.settings.find_one({"id": "app"}) or {}
     tz = settings.get("timezone") or "UTC"
@@ -56,23 +96,7 @@ async def build_briefing() -> str:
     greet = "Good morning" if hour < 12 else "Good afternoon" if hour < 18 else "Good evening"
     out = [f"{greet}! Here's your {d.strftime('%A')}, {d.strftime('%B')} {_ordinal(d.day)}."]
 
-    home = settings.get("home")
-    if home:
-        try:
-            units = settings.get("units", "celsius")
-            wb = await weather_lib.get_bundle(home["latitude"], home["longitude"], units)
-            day = next((x for x in wb.days if x.date == today), wb.days[0] if wb.days else None)
-            line = (f"In {home['name']} it's {round(wb.now.temperature)} degrees with "
-                    f"{WEATHER_WORDS.get(wb.now.code, 'mixed weather')}")
-            if day:
-                line += f", heading for a high of {round(day.tempMax)}"
-                if day.precipProb >= 20:
-                    line += f" and a {round(day.precipProb)} percent chance of rain"
-            out.append(line + ".")
-        except Exception:
-            out.append("I couldn't reach the weather service just now.")
-    else:
-        out.append("Set a home city in Settings and I'll include the weather.")
+    out.append(await _weather_line(settings, today))
 
     appts = await db.appointments.find({"date": today}).sort("startTime", 1).to_list(50)
     if appts:

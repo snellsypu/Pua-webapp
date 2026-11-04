@@ -8,6 +8,7 @@ import { apiGet, apiPut } from "@/lib/api";
 import type { AppSettings, GeoPlace, ReversePlace, SettingsUpdate } from "@/lib/types";
 import { NotificationsCard } from "@/components/NotificationsCard";
 import { VoiceSettingsCard } from "@/components/VoiceSettingsCard";
+import { OverviewWakeCard } from "@/components/OverviewWakeCard";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -244,6 +245,8 @@ export default function Settings() {
           </div>
         </CardContent>
       </Card>
+
+      <OverviewWakeCard />
 
       <VoiceSettingsCard />
 

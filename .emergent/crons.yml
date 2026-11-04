@@ -1,7 +1,7 @@
 crons:
   - name: routine-reminders
-    description: "Sends morning and bedtime routine push notifications when their set time arrives"
-    cron: "*/15 * * * *"
+    description: "Sends the wake-up notification and morning/bedtime routine push notifications when their set times arrive"
+    cron: "*/5 * * * *"
     # Cron endpoints must ack 2xx immediately; enqueue/background the actual work.
     endpoint: "{{BASE_URL}}/api/cron/routines"
     method: POST

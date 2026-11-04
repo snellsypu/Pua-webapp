@@ -18,7 +18,7 @@ from pydantic import ValidationError
 
 from lib.db import db
 from lib.dates import today_iso
-from lib.briefing import build_briefing
+from lib.briefing import build_briefing, build_wake
 from lib.voice_intents import is_briefing, match_score, parse_checkoff, parse_shopping, tokens
 from lib.voice_simple import EXAMPLES, parse_simple
 from models.voice import VoiceDraft, VoiceParseIn, VoiceParseOut, VoiceTranscript
@@ -197,6 +197,12 @@ async def parse(input: VoiceParseIn):
         return found
     draft, message = parse_simple(text, today)
     return VoiceParseOut(transcript=text, mode="simple", draft=draft, message=message)
+
+
+@router.get("/wake", response_model=VoiceTranscript)
+async def wake_text():
+    """Text read aloud when the wake-up link / notification opens PUA."""
+    return VoiceTranscript(text=await build_wake())
 
 
 @router.post("/transcribe", response_model=VoiceTranscript)

@@ -1,4 +1,6 @@
-import { Link, NavLink, Outlet } from "react-router-dom";
+import { useEffect, useRef } from "react";
+import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { MotionConfig } from "motion/react";
 import {
   CalendarDays,
@@ -16,6 +18,10 @@ import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { CreateFab } from "@/components/CreateFab";
 import { VoiceAssistant } from "@/components/VoiceAssistant";
+import { markWoken, shouldWakeOnOpen } from "@/components/WakeBanner";
+import { useDayPart } from "@/lib/useDayPart";
+import { apiGet } from "@/lib/api";
+import type { AppSettings } from "@/lib/types";
 
 const NAV = [
   { to: "/", label: "Today", icon: SunMedium, testid: "nav-today" },
@@ -26,6 +32,26 @@ const NAV = [
 ];
 
 export default function AppShell() {
+  const daypart = useDayPart();
+  const evening = daypart.data?.part === "evening";
+  const settings = useQuery({ queryKey: ["settings"], queryFn: () => apiGet<AppSettings>("/settings") });
+  const navigate = useNavigate();
+  const location = useLocation();
+  const checked = useRef(false);
+
+  // Wake-up read: once per day, either opened via the wake link/notification, or the
+  // first open after the wake-up time when "read on first open" is on for this device.
+  useEffect(() => {
+    const dp = daypart.data;
+    if (!dp || !settings.data || checked.current) return;
+    checked.current = true;
+    if (new URLSearchParams(location.search).get("wake") === "1") markWoken(dp.date);
+    else if (shouldWakeOnOpen(dp, settings.data.wakeTime)) {
+      markWoken(dp.date);
+      navigate("/overview?wake=1", { replace: true });
+    }
+  }, [daypart.data, settings.data, location.search, navigate]);
+
   return (
     <MotionConfig reducedMotion="user">
       <div className="min-h-svh">
@@ -67,26 +93,15 @@ export default function AppShell() {
             </nav>
             <div className="ml-auto flex items-center gap-1">
               <NavLink
-                to="/morning"
-                data-testid="nav-morning"
-                title="Morning briefing"
-                aria-label="Morning briefing"
+                to="/overview"
+                data-testid="nav-overview"
+                title={evening ? "Tomorrow's review" : "Today's briefing"}
+                aria-label={evening ? "Tomorrow's review" : "Today's briefing"}
                 className={({ isActive }) =>
                   cn(buttonVariants({ variant: isActive ? "secondary" : "ghost", size: "icon-sm" }))
                 }
               >
-                <Sunrise className="size-4" />
-              </NavLink>
-              <NavLink
-                to="/evening"
-                data-testid="nav-evening"
-                title="Evening review"
-                aria-label="Evening review"
-                className={({ isActive }) =>
-                  cn(buttonVariants({ variant: isActive ? "secondary" : "ghost", size: "icon-sm" }))
-                }
-              >
-                <MoonStar className="size-4" />
+                {evening ? <MoonStar className="size-4" /> : <Sunrise className="size-4" />}
               </NavLink>
               <ThemeToggle />
               <NavLink
