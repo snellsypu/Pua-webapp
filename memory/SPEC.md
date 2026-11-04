@@ -224,4 +224,19 @@ runs even on an already-seeded DB): last night's sleep (7h35m, score 88), yester
 Running 37 min/320 kcal, yesterday's Oatmeal 420 kcal + Chicken salad 560 kcal.
 
 ## Auth
-None — single-user local app, no login, no credentials (see memory/test_credentials.md).
+Emergent-managed Google sign-in (lib/auth.py, routers/auth.py, frontend lib/auth.tsx).
+- Single shared planner + allow-list: `access` doc {id, owner, emails[]}. First Google sign-in
+  claims ownership (atomic); afterwards only listed emails may sign in (403 otherwise, shown on
+  the sign-in page). Owner manages the list in Settings → Who has access (`AccessCard`,
+  GET/POST `/api/auth/access`, DELETE `/api/auth/access/{email}`; owner can't be removed).
+- Flow: SignIn "Continue with Google" → auth.emergentagent.com?redirect=<current page URL,
+  derived from window.location> → back at `<page>#session_id=…` → AuthGate (reads
+  `useLocation().hash`) renders AuthCallback → POST `/api/auth/session` (backend calls Emergent
+  session-data) → users upsert (custom user_id) + user_sessions (7 days, TTL index) + httpOnly
+  `session_token` cookie (secure, SameSite=None) → navigate to the same page without the hash.
+- Gate: `api_router = APIRouter(prefix="/api", dependencies=[Depends(require_user)])`; public:
+  /api/auth/session, /api/auth/me (401 when signed out), /api/auth/logout, /api/cron/routines
+  (own secret). Sessions are re-checked against the allow-list on every request.
+- Frontend: AuthGate wraps all routes (splash → SignIn or app); any 401 re-checks /auth/me;
+  header AccountButton (avatar, name, email, Owner badge, Who has access, Sign out).
+- Testing: /app/auth_testing.md + memory/test_credentials.md.

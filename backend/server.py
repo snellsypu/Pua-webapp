@@ -1,6 +1,6 @@
 import asyncio
 from contextlib import asynccontextmanager, suppress
-from fastapi import FastAPI, APIRouter
+from fastapi import FastAPI, APIRouter, Depends
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 import os
@@ -18,6 +18,8 @@ load_dotenv(ROOT_DIR / '.env')
 # MongoDB connection
 from lib.db import client, db, ensure_indexes
 from lib import weather as weather_lib
+from lib.auth import require_user
+from routers import auth as auth_routes
 from routers import appointments, commute, runplan, habits, health, meals, overview, push, reminders, routines, shopping, voice
 from routers import settings as settings_routes
 from routers import weather as weather_routes
@@ -39,7 +41,8 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 # Create a router with the /api prefix
-api_router = APIRouter(prefix="/api")
+# Every /api route needs a signed-in, allow-listed user (lib/auth.PUBLIC_PATHS are exempt).
+api_router = APIRouter(prefix="/api", dependencies=[Depends(require_user)])
 
 
 # Define Models
@@ -69,6 +72,7 @@ async def get_status_checks():
     return [StatusCheck(**status_check) for status_check in status_checks]
 
 # Mount resource routers (all under the /api prefix)
+api_router.include_router(auth_routes.router)
 api_router.include_router(overview.router)
 api_router.include_router(appointments.router)
 api_router.include_router(habits.router)

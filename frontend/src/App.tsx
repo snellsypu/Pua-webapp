@@ -8,10 +8,12 @@ import Overview from "@/pages/Overview";
 import Settings from "@/pages/Settings";
 import Health from "@/pages/Health";
 import NotFound from "@/pages/NotFound";
+import { AuthGate } from "@/lib/auth";
 
 // One <Route> per page in src/pages; BrowserRouter already wraps this in main.tsx.
 export default function App() {
   return (
+    <AuthGate>
     <Routes>
       <Route element={<AppShell />}>
         <Route path="/" element={<Home />} />
@@ -27,5 +29,6 @@ export default function App() {
         <Route path="*" element={<NotFound />} />
       </Route>
     </Routes>
+    </AuthGate>
   );
 }

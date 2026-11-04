@@ -10,6 +10,7 @@ import { NotificationsCard } from "@/components/NotificationsCard";
 import { VoiceSettingsCard } from "@/components/VoiceSettingsCard";
 import { OverviewWakeCard } from "@/components/OverviewWakeCard";
 import { CommuteCard } from "@/components/CommuteCard";
+import { AccessCard } from "@/components/AccessCard";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -246,6 +247,8 @@ export default function Settings() {
           </div>
         </CardContent>
       </Card>
+
+      <AccessCard />
 
       <OverviewWakeCard />
 

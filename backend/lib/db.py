@@ -42,6 +42,15 @@ INDEXES: dict[str, list[IndexModel]] = {
         IndexModel([("kind", ASCENDING), ("complete", ASCENDING)], name="kind_complete"),
     ],
     "push_subscriptions": [IndexModel([("endpoint", ASCENDING)], name="endpoint", unique=True)],
+    "users": [
+        IndexModel([("email", ASCENDING)], name="email", unique=True),
+        IndexModel([("user_id", ASCENDING)], name="user_id", unique=True),
+    ],
+    "user_sessions": [
+        IndexModel([("session_token", ASCENDING)], name="session_token", unique=True),
+        IndexModel([("expires_at", ASCENDING)], name="expires_ttl", expireAfterSeconds=0),
+    ],
+    "access": [IndexModel([("id", ASCENDING)], name="id", unique=True)],
     "cron_runs": [
         IndexModel([("runId", ASCENDING)], name="run_id", unique=True),
         IndexModel([("at", ASCENDING)], name="at_ttl", expireAfterSeconds=7 * 24 * 3600),

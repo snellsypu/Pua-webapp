@@ -1,0 +1,94 @@
+{
+  "iteration": 1,
+  "mode": "generate",
+  "passed": 10,
+  "failed": 0,
+  "summary": "8 acceptance criteria covered via 2 backend test files run as 10 assertions-equivalent tests, plus 7 browser checks (one run twice: once on localhost, once on the required public preview URL). All checks passed after fixing two browser-check issues during authoring (HTML5 email validation intercepting the invalid-email case; a same-URL+hash page.goto being a same-document no-op that kept a stale React Query cache across a cookie swap) — both were test-script bugs, not app bugs, and were corrected before final run.",
+  "bugs": [],
+  "action_items": [],
+  "retest_needed": false,
+  "checks": [
+    {
+      "criterion": "Signed-out visitors cannot use the app",
+      "name": "signed-out-shows-signin",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "/, /overview?wake=1, /settings all rendered data-testid=signin-page while signed out; console showed 3x 401 on background /api calls confirming the gate."
+    },
+    {
+      "criterion": "Signed-out visitors cannot use the app",
+      "name": "signed-out-shows-signin-preview",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Run against https://daily-loop-8--68ipsq2d.preview.emergentagent.com/ (required ingress check) — signin-page visible, 401 on background API call."
+    },
+    {
+      "criterion": "Signed-out visitors cannot use the app (API)",
+      "name": "test_tscheck_signed_out_401",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "GET /api/habits -> 401, GET /api/settings -> 401, GET /api/appointments -> 401 (no Authorization header)."
+    },
+    {
+      "criterion": "Continue with Google starts Emergent auth and returns to the same page",
+      "name": "google-signin-redirect",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Stubbed https://auth.emergentagent.com/** with page.route; clicking signin-google-button navigated to that domain with ?redirect=<url-encoded current page path+query including /overview and wake=1>."
+    },
+    {
+      "criterion": "Invalid callback is handled",
+      "name": "invalid-callback-error",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Visited /#session_id=bogus; signin-page + signin-error (text matched /sign-in/i) shown; window.location.hash became '' after the exchange failed."
+    },
+    {
+      "criterion": "Signed-in allow-listed user gets the full app",
+      "name": "signed-in-full-app",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Cookie-injected owner session loaded Home/Habits/Planner with no 401s; created+ticked a tscheck- habit (streak badge appeared), added+deleted a tscheck- shopping item, /api/auth/me returned the user; habit cleaned up via DELETE /api/habits/{id}."
+    },
+    {
+      "criterion": "Account menu",
+      "name": "account-menu-signout",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "account-menu showed account-name, account-email matching the owner, and account-owner-badge; Sign out returned to signin-page; subsequent GET /api/habits with that (now deleted) session -> 401; reload stayed on signin-page."
+    },
+    {
+      "criterion": "Owner manages access",
+      "name": "owner-manage-access",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Owner session: owner row had no access-remove button; added a tscheck- email (appeared in access-list); invalid email 'foo@bar' showed toast \"doesn't look like an email address\" (422); removed the added email (row disappeared). Non-owner session (fresh SPA load): access-list visible, access-add-button absent (0 count)."
+    },
+    {
+      "criterion": "Owner manages access (API: invalid email, non-owner 403)",
+      "name": "test_tscheck_access_management",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "Owner POST /auth/access {email: valid} -> 200 with email in list, then DELETE -> 200 with email removed; POST {email:'not-an-email'} -> 422; DELETE owner's own email -> 400; non-owner GET /auth/access -> 200, POST -> 403, DELETE -> 403."
+    },
+    {
+      "criterion": "Removed users lose access",
+      "name": "test_tscheck_removed_user_access",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "GET /auth/me with a valid allow-listed session -> 200; owner DELETE /auth/access/{email} -> 200; same (still-unexpired) session token then GET /auth/me -> 401 and GET /habits -> 401."
+    },
+    {
+      "criterion": "Cron webhook not behind the session gate",
+      "name": "test_tscheck_cron_webhook",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "POST /api/cron/routines with Authorization: Bearer wrong -> 401 (its own secret check, route is in PUBLIC_PATHS so reachable without a session); POST with no auth header -> 401/403."
+    }
+  ],
+  "notes": [
+    "11 criteria x artifacts covered the 8-item acceptance matrix (one criterion got both a backend test and 1-2 browser checks since it has both API and UI surfaces).",
+    "Secure, httpOnly, SameSite=None cookies set by the real backend require HTTPS; localhost dev server is HTTP, so browser checks that inject a session cookie set secure:false on the injected cookie only (a test-harness workaround, not an app change) to exercise the authenticated app locally.",
+    "CRITICAL CLEANUP DONE: access.owner set back to null, access.emails emptied of all test/tscheck entries, all test.user.*/tscheck-* users and sessions deleted, and the tscheck- shopping item/habit created during testing were deleted. Verified via mongosh: access doc is {id:'access', owner:null, emails:[]} and no residual test users/sessions remain. The real owner can now claim the app via their first Google sign-in."
+  ]
+}

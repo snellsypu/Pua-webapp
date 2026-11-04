@@ -364,3 +364,17 @@ export interface VoiceParseOut {
 export interface VoiceTranscript {
   text: string;
 }
+
+// Mirrors backend/models/auth.py
+export interface AuthUser {
+  user_id: string;
+  email: string;
+  name: string;
+  picture: string;
+  isOwner: boolean;
+}
+
+export interface AccessList {
+  owner: string | null;
+  emails: string[];
+}

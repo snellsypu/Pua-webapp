@@ -16,6 +16,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { AccountButton } from "@/components/AccountButton";
 import { CreateFab } from "@/components/CreateFab";
 import { VoiceAssistant } from "@/components/VoiceAssistant";
 import { markRead, readOnOpen } from "@/components/WakeBanner";
@@ -109,6 +110,7 @@ export default function AppShell() {
                 {evening ? <MoonStar className="size-4" /> : <Sunrise className="size-4" />}
               </NavLink>
               <ThemeToggle />
+              <AccountButton />
               <NavLink
                 to="/settings"
                 data-testid="nav-settings"
