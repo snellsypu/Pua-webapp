@@ -1,8 +1,8 @@
 import { useState } from "react";
+import { FlowerTick, flowerFor } from "@/components/Flower";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { motion } from "motion/react";
 import { toast } from "sonner";
-import { Check } from "lucide-react";
 import { apiGet, apiPost } from "@/lib/api";
 import type { AppSettings, HabitLog, HabitStats, HabitToggleOut } from "@/lib/types";
 import { fmtDist } from "@/lib/units";
@@ -107,11 +107,11 @@ export function HabitList({
               className={cn(
                 "grid size-7 shrink-0 place-items-center rounded-full border-2 transition-colors",
                 h.doneToday
-                  ? "border-primary bg-primary text-primary-foreground"
+                  ? "border-transparent"
                   : "border-input hover:border-primary",
               )}
             >
-              {h.doneToday && <Check className="size-4" />}
+              {h.doneToday && <FlowerTick kind={flowerFor(h.id)} className="size-8" />}
             </motion.button>
             <div className="min-w-0 flex-1">
               <div className="truncate text-sm font-medium">

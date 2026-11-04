@@ -56,7 +56,7 @@ async def create_session(user: dict, session_token: str) -> dict:
         {"email": email},
         {"$set": {"name": user.get("name") or email, "picture": user.get("picture") or "", "lastLoginAt": now},
          "$setOnInsert": {"user_id": f"user_{uuid.uuid4().hex[:12]}", "email": email, "created_at": now,
-                          "onboarded": False, "friendCode": new_friend_code(), "shareCategories": []}},
+                          "onboarded": False}},
         upsert=True,
     )
     doc = await raw_db.users.find_one({"email": email}, {"_id": 0})

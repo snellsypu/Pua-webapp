@@ -57,7 +57,7 @@ export function describeDraft(d: VoiceDraft, unit: DistanceUnit): string {
   const day = d.date ? fmtShort(d.date) : "";
   switch (d.kind) {
     case "appointment":
-      return `Appointment: ${d.title}, ${day} at ${spokenTime(d.startTime)}${d.location ? `, at ${d.location}` : ""}.`;
+      return `${d.private ? "Private appointment" : "Appointment"}: ${d.title}, ${day} at ${spokenTime(d.startTime)}${d.location ? `, at ${d.location}` : ""}.`;
     case "reminder":
       return `Reminder: ${d.title}, ${day} at ${spokenTime(d.time)}.`;
     case "habit":
@@ -122,7 +122,7 @@ export function VoiceAssistant() {
       if (d.kind === "appointment")
         return apiPost("/appointments", {
           title: d.title, date: d.date, startTime: d.startTime ?? "09:00",
-          endTime: d.endTime || null, location: d.location, notes: "",
+          endTime: d.endTime || null, location: d.location, notes: "", private: d.private,
         });
       if (d.kind === "reminder")
         return apiPost("/reminders", { title: d.title, date: d.date, time: d.time ?? "09:00" });
@@ -526,6 +526,10 @@ export function VoiceAssistant() {
                   <div className="grid gap-1.5">
                     <Label htmlFor="voice-location">Location</Label>
                     <Input id="voice-location" value={draft.location} onChange={(e) => set({ location: e.target.value })} placeholder="optional" data-testid="voice-location-input" />
+                    <label htmlFor="voice-private" className="mt-1 flex items-center gap-2 text-sm">
+                      <Checkbox id="voice-private" checked={draft.private} onCheckedChange={(v) => set({ private: v === true })} data-testid="voice-private-checkbox" />
+                      Private — friends see &ldquo;Unavailable&rdquo;
+                    </label>
                   </div>
                 )}
                 {draft.kind === "habit" && (

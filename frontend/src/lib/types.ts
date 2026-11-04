@@ -338,6 +338,7 @@ export interface VoiceDraft {
   startTime: string | null;
   endTime: string | null;
   location: string;
+  private: boolean; // appointment — friends see "Unavailable"
   time: string | null;
   emoji: string;
   habitMode: HabitMode;
@@ -386,16 +387,30 @@ export interface Person {
 }
 
 export interface JoinedPlanner extends Person {
-  categories: ShareCategory[];
+  categories: ShareCategory[]; // union of every bouquet of theirs you joined
   shoppingEdit: boolean; // you may tick off / add items on their list
+  bouquets: string[]; // names of their bouquets you're in
+}
+
+// A group you share with — its own code and its own choice of what's shared
+export interface Bouquet {
+  id: string;
+  name: string;
+  code: string;
+  categories: ShareCategory[];
+  shoppingEdit: boolean;
+  members: Person[];
 }
 
 export interface SharingState {
-  friendCode: string;
-  categories: ShareCategory[];
-  shoppingEdit: boolean; // friends may tick off / add shopping items
-  members: Person[];
+  bouquets: Bouquet[];
   joined: JoinedPlanner[];
+}
+
+export interface BouquetUpdate {
+  name?: string;
+  categories?: ShareCategory[];
+  shoppingEdit?: boolean;
 }
 
 // Mirrors backend/models/sharing.py — view-only snapshot of a friend's planner

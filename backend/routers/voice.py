@@ -40,6 +40,8 @@ Return ONLY a JSON object, no prose, no code fences, with these keys:
   "startTime": "HH:MM" 24h or null        (appointment)
   "endTime": "HH:MM" 24h or null          (appointment)
   "location": string, "" if none          (appointment)
+  "private": true|false                   (appointment; true if they say private/personal/secret
+          or ask to hide it from friends — then leave that word out of the title)
   "time": "HH:MM" 24h or null             (reminder)
   "emoji": one fitting emoji              (habit)
   "habitMode": "streak" | "monthly"       (habit; "N times a month" = monthly)
@@ -89,7 +91,7 @@ async def _parse_ai(text: str, today: date) -> dict | None:
 def _to_draft(data: dict) -> VoiceDraft | None:
     if data.get("kind") not in ("appointment", "habit", "reminder"):
         return None
-    allowed = {"kind", "title", "date", "startTime", "endTime", "location", "time", "emoji",
+    allowed = {"kind", "title", "date", "startTime", "endTime", "location", "private", "time", "emoji",
                "habitMode", "monthlyTarget", "tracksDistance"}
     data = {k: v for k, v in data.items() if k in allowed and (v is not None or k in ("date", "startTime", "endTime", "time"))}
     try:

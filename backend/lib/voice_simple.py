@@ -1,7 +1,7 @@
 """Free-mode voice parser: turns a fixed-pattern phrase into a VoiceDraft.
 
 Understood patterns (case-insensitive, filler words ignored):
-  appointment / meeting / event <title> [at|in <place>] [<day>] [at <time>] [to|until <time>]
+  [private] appointment / meeting / event <title> [at|in <place>] [<day>] [at <time>] [to|until <time>]
   remind me to <title> [<day>] [at <time>]      — or "reminder <title> …"
   [monthly] habit <title> [<N> times a month] [track distance]
   <day> = today, tonight, tomorrow, day after tomorrow, [next] monday…sunday,
@@ -128,6 +128,7 @@ EXAMPLES = ('Try: "appointment dentist tomorrow at 3pm", "remind me to call mum 
 
 
 def parse_simple(raw: str, today: date) -> tuple[VoiceDraft | None, str | None]:
+    raw = re.sub(r"^\s*(?:hey|hi|ok|okay)[\s,]+pua\b[\s,.!?]*", "", raw, flags=re.I)  # typed wake word
     text = " " + re.sub(r"\s+", " ", raw.strip().rstrip(".!?")) + " "
     low = text.lower()
 
@@ -173,7 +174,13 @@ def parse_simple(raw: str, today: date) -> tuple[VoiceDraft | None, str | None]:
         kind = "appointment"
 
     location = ""
+    private = False
     if kind == "appointment":
+        # "private dentist appointment", "…, keep it private", "mark it as private"
+        priv = r"\b(?:(?:and\s+)?(?:keep|make|mark|set)\s+(?:it\s+)?(?:as\s+)?)?(?:private(?:ly)?|personal|secret)\b"
+        if re.search(priv, text, re.I):
+            private = True
+            text = re.sub(priv, " ", text, flags=re.I)
         m = re.search(r"\b(?:at|in)\s+(?:the\s+)?([A-Za-z][\w'’&. ]{1,60}?)\s*$", text.strip(), re.I)
         if m and m.group(1).lower() not in ("the", "morning", "evening"):
             location = m.group(1).strip().title() if m.group(1).islower() else m.group(1).strip()
@@ -188,4 +195,4 @@ def parse_simple(raw: str, today: date) -> tuple[VoiceDraft | None, str | None]:
     if kind == "reminder":
         return VoiceDraft(kind="reminder", title=title, date=when, time=the_time or "09:00"), None
     return VoiceDraft(kind="appointment", title=title, date=when, startTime=the_time or "09:00",
-                      endTime=end_time, location=location), None
+                      endTime=end_time, location=location, private=private), None

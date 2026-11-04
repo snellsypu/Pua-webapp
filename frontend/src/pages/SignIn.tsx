@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { motion } from "motion/react";
 import { AlertCircle, ListChecks, Mic, Sunrise } from "lucide-react";
+import { PuaLogo } from "@/components/Flower";
 import { AUTH_ERROR_KEY, signIn } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -33,11 +34,9 @@ export default function SignIn() {
         className="relative w-full max-w-md rounded-3xl border bg-card/80 p-8 shadow-xl backdrop-blur"
         data-testid="signin-page"
       >
-        <span className="grid size-12 place-items-center rounded-2xl bg-primary text-primary-foreground">
-          <Sunrise className="size-6" />
-        </span>
-        <h1 className="mt-5 font-heading text-3xl font-bold tracking-tight" data-testid="signin-title">PUA</h1>
-        <p className="text-sm text-muted-foreground">Personal Uplink Assistant</p>
+        <h1 className="sr-only" data-testid="signin-title">PUA</h1>
+        <PuaLogo size="lg" />
+        <p className="mt-2 text-sm text-muted-foreground">Personal Uplink Assistant</p>
         <p className="mt-5 text-base leading-relaxed">
           Your day in one place — appointments, habits, routines, weather and travel times, by tap or by voice.
         </p>

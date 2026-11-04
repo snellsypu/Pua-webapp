@@ -35,25 +35,36 @@ class Person(BaseModel):
 
 
 class JoinedPlanner(Person):
+    """A planner you can view — access is the union of every bouquet of theirs you joined."""
     categories: list[ShareCategory]
-    shoppingEdit: bool = False  # friends may tick off / add shopping items
+    shoppingEdit: bool = False  # you may tick off / add items on their shopping list
+    bouquets: list[str]  # names of their bouquets you're in
+
+
+class Bouquet(BaseModel):
+    """A group you share with: its own join code and its own choice of what's shared."""
+    id: str
+    name: str
+    code: str
+    categories: list[ShareCategory]
+    shoppingEdit: bool = True  # members may tick off / add shopping items (if shopping shared)
+    members: list[Person]
 
 
 class SharingState(BaseModel):
-    friendCode: str
-    categories: list[ShareCategory]  # what this user shares
-    shoppingEdit: bool = True  # friends may tick off / add items on the shared shopping list
-    members: list[Person]  # people who joined with this user's code
-    joined: list[JoinedPlanner]  # planners this user can view
+    bouquets: list[Bouquet]  # your bouquets (you're the admin)
+    joined: list[JoinedPlanner]  # planners you can view
 
 
-class CategoriesIn(BaseModel):
-    categories: list[ShareCategory] = Field(max_length=6)
+class BouquetCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=40)
+
+
+class BouquetUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=40)
+    categories: list[ShareCategory] | None = Field(default=None, max_length=6)
+    shoppingEdit: bool | None = None
 
 
 class JoinIn(BaseModel):
     code: str = Field(min_length=4, max_length=16)
-
-
-class ShoppingEditIn(BaseModel):
-    enabled: bool

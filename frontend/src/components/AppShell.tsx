@@ -5,11 +5,11 @@ import { MotionConfig } from "motion/react";
 import {
   CalendarDays,
   HeartPulse,
-  Users,
   ListChecks,
   MoonStar,
   Settings as SettingsIcon,
   Sunrise,
+  Flower2,
   SunMedium,
   UtensilsCrossed,
 } from "lucide-react";
@@ -24,6 +24,7 @@ import { markRead, readOnOpen } from "@/components/WakeBanner";
 import { useDayPart } from "@/lib/useDayPart";
 import { apiGet } from "@/lib/api";
 import type { AppSettings } from "@/lib/types";
+import { PuaLogo } from "@/components/Flower";
 
 const NAV = [
   { to: "/", label: "Today", icon: SunMedium, testid: "nav-today" },
@@ -31,7 +32,7 @@ const NAV = [
   { to: "/habits", label: "Habits", icon: ListChecks, testid: "nav-habits" },
   { to: "/planner", label: "Planner", icon: UtensilsCrossed, testid: "nav-planner" },
   { to: "/health", label: "Health", icon: HeartPulse, testid: "nav-health" },
-  { to: "/sharing", label: "Sharing", icon: Users, testid: "nav-sharing" },
+  { to: "/sharing", label: "Bouquets", icon: Flower2, testid: "nav-sharing" },
 ];
 
 export default function AppShell() {
@@ -70,14 +71,9 @@ export default function AppShell() {
               className="mr-3 flex items-center gap-2 font-heading text-base font-bold tracking-tight"
               data-testid="nav-logo"
             >
-              <span className="grid size-8 place-items-center rounded-xl bg-primary text-primary-foreground">
-                <Sunrise className="size-4" />
-              </span>
-              <span className="hidden leading-tight sm:inline">
-                PUA
-                <span className="block text-[10px] font-medium tracking-normal text-muted-foreground">
-                  Personal Uplink Assistant
-                </span>
+              <PuaLogo />
+              <span className="hidden max-w-20 text-[10px] font-medium leading-tight tracking-normal text-muted-foreground lg:inline">
+                Personal Uplink Assistant
               </span>
             </Link>
             <nav className="flex items-center gap-1">

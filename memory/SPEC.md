@@ -237,21 +237,26 @@ Emergent-managed Google sign-in (lib/auth.py, routers/auth.py, frontend lib/auth
 - **First sign-in**: `AuthUser.onboarded=false` → Onboarding page: Sample planner
   (seed.run_all under the user's scope), Starter packs, or Clear planner (routines with no
   steps) → POST `/api/auth/onboard {sample, packs?}`.
-- **Friend codes / sharing (view-only)**: users have `friendCode` (8 chars, no 0/O/1/I,
-  shown ABCD-2345) and `shareCategories` ⊆ appointments, reminders, habits, routines, meals,
-  shopping (admin = planner owner; "Everything" = all). `shares` {ownerId, viewerId}.
-  `/api/sharing`: GET state {friendCode, categories, members, joined}; PUT /categories;
-  POST /code/regenerate (old code stops, members stay); POST /join {code} (404 unknown,
-  400 own); DELETE /members/{viewerId} (admin removes); DELETE /joined/{ownerId} (leave);
-  GET /planner/{ownerId} → SharedPlanner snapshot (404 without a link) built by calling the
-  normal list handlers under the owner's scope: appointments/reminders today+13 d, habits,
-  routines today, meals this week, shopping — only shared categories (others null).
-- **Shared shopping edits**: user `shoppingEdit` (default true; PUT /sharing/shopping-edit
-  {enabled}) — when shopping is shared and enabled, viewers may POST
+- **Bouquets (groups; view-only)**: replaced the single friend code (old `shares` + user
+  friendCode/shareCategories were removed by migration). `bouquets` {id, ownerId, name, code
+  (8 chars, no 0/O/1/I, shown ABCD-2345), categories ⊆ appointments, reminders, habits,
+  routines, meals, shopping, shoppingEdit}; `bouquet_members` {bouquetId, ownerId, viewerId}.
+  A viewer's access to a planner = union of categories of every bouquet of that owner they
+  joined; joining another bouquet never removes them from one. Max 12 bouquets per user.
+  `/api/sharing`: GET → {bouquets[{…, members}], joined[{person, categories, shoppingEdit,
+  bouquets: names}]}; POST /bouquets {name}; PUT /bouquets/{id} {name?, categories?,
+  shoppingEdit?}; DELETE /bouquets/{id}; POST /bouquets/{id}/code (new code, members stay);
+  DELETE /bouquets/{id}/members/{viewerId}; POST /join {code} (404 unknown, 400 own);
+  DELETE /joined/{ownerId} (leave all their bouquets); GET /planner/{ownerId} snapshot (404
+  without membership): appointments/reminders today+13 d, habits, routines, meals this week,
+  shopping — only shared categories (others null).
+- **Shared shopping edits**: per-bouquet `shoppingEdit` (default true) — when any of the
+  viewer's bouquets shares shopping with edits on, viewers may POST
   /sharing/planner/{ownerId}/shopping {name} and PATCH .../shopping/{itemId} {checked}
   (tick only, no rename/delete); 403 when off, 404 without a link. Everything else view-only.
 - **Private appointments**: `Appointment.private` (create-dialog "Private" switch, lock icon in
-  agendas). Friends get them masked as "Unavailable" (time kept; location/notes/coords dropped)
+  agendas; voice: "private"/"personal"/"secret"/"keep it private" → VoiceDraft.private, also
+  in the Claude prompt; preview has a Private checkbox). Friends get them masked as "Unavailable" (time kept; location/notes/coords dropped)
   in the snapshot and the calendar overlay.
 - **Combined calendar**: GET /sharing/calendar?from&to → [{owner, appointments}] for joined
   planners that share appointments. Calendar shows a coloured dot per friend per day, a legend
@@ -265,3 +270,11 @@ Emergent-managed Google sign-in (lib/auth.py, routers/auth.py, frontend lib/auth
   friends, Sign out); nav "Sharing".
 - Device-local prefs (wake/bedtime first-open, spoken replies, wake word) stay per device.
 - Testing: /app/auth_testing.md + memory/test_credentials.md.
+
+## Look: Hawaiian flower ticks & logo
+- components/Flower.tsx: SVG plumeria, pink plumeria, hibiscus, ʻilima, lehua; `flowerFor(key)`
+  picks one deterministically; `.pua-bloom` keyframe (index.css) pops them open.
+- Every tick blooms: ui/checkbox.tsx (round bud → flower, kind from id/data-testid), habit
+  check buttons, shared-planner habits, onboarding packs, routine "All done", theme choice.
+- Logo `PuaLogo`: luau plumeria above the word PUA (header, sign-in); favicon.svg plumeria.
+  Nav item "Bouquets" (route /sharing).

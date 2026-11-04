@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
+import { Flower } from "@/components/Flower";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Check, Loader2, Lock, MapPin, Search, Trash2 } from "lucide-react";
+import { Loader2, Lock, MapPin, Search, Trash2 } from "lucide-react";
 import { apiDelete, apiGet, apiPost, apiPut, ApiError } from "@/lib/api";
 import type { AppSettings, Appointment, GeoPlace, TravelMode } from "@/lib/types";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -246,7 +247,7 @@ export function AppointmentDialog({
             )}
             <p className="flex items-center gap-1 text-[11px] text-muted-foreground" data-testid="appointment-location-hint">
               {coords ? (
-                <><Check className="size-3 text-primary" /> On the map — travel times will use this exact place</>
+                <><Flower kind="plumeria" className="size-3.5" /> On the map — travel times will use this exact place</>
               ) : (
                 <>Tap Find to pick the real place so PUA can work out travel time · © OpenStreetMap</>
               )}

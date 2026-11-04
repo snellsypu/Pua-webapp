@@ -1,9 +1,10 @@
 import { useState } from "react";
+import { FlowerTick } from "@/components/Flower";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { motion } from "motion/react";
 import { toast } from "sonner";
 import { useTheme } from "next-themes";
-import { Check, LocateFixed, MapPin, Search } from "lucide-react";
+import { LocateFixed, MapPin, Search } from "lucide-react";
 import { apiGet, apiPut } from "@/lib/api";
 import type { AppSettings, GeoPlace, ReversePlace, SettingsUpdate } from "@/lib/types";
 import { NotificationsCard } from "@/components/NotificationsCard";
@@ -201,7 +202,7 @@ export default function Settings() {
                   data-testid={`settings-theme-${opt.value}`}
                   onClick={() => setTheme(opt.value)}
                 >
-                  {theme === opt.value && <Check className="size-3.5" />} {opt.label}
+                  {theme === opt.value && <FlowerTick kind="plumeria" className="size-4" />} {opt.label}
                 </Button>
               ))}
             </div>

@@ -55,7 +55,7 @@ export function AccountButton() {
         </div>
         <div className="grid gap-1.5">
           <Button variant="outline" size="sm" onClick={() => navigate("/sharing")} data-testid="account-sharing">
-            <Users className="size-4" /> Sharing &amp; friends
+            <Users className="size-4" /> Bouquets &amp; friends
           </Button>
           <Button variant="ghost" size="sm" disabled={logout.isPending} onClick={() => logout.mutate()} data-testid="account-signout">
             <LogOut className="size-4" /> Sign out

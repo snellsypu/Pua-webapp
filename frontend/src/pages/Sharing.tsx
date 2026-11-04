@@ -1,13 +1,16 @@
-// Sharing & friends: your friend code, what friends may see (view-only), who's viewing,
-// and joining someone else's planner with their code.
+// Bouquets: groups you share your planner with. Each bouquet has its own code and its own
+// choice of what's shared (view-only, plus optional shopping edits). Joining another
+// bouquet never removes you from the first.
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { AnimatePresence, motion } from "motion/react";
 import { toast } from "sonner";
-import { Copy, Eye, KeyRound, LogOut, RefreshCw, UserMinus, UserPlus, Users } from "lucide-react";
+import { Copy, Eye, LogOut, Pencil, Plus, RefreshCw, Trash2, UserMinus, UserPlus } from "lucide-react";
 import { apiDelete, apiGet, apiPost, apiPut, ApiError } from "@/lib/api";
-import type { ShareCategory, SharingState } from "@/lib/types";
+import type { Bouquet, BouquetUpdate, ShareCategory, SharingState } from "@/lib/types";
 import { Avatar } from "@/components/AccountButton";
+import { Flower, flowerFor } from "@/components/Flower";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -18,143 +21,181 @@ export const SHARE_LABELS: Record<ShareCategory, string> = {
   routines: "Routines", meals: "Meal plan", shopping: "Shopping list",
 };
 const ALL = Object.keys(SHARE_LABELS) as ShareCategory[];
+const fmtCode = (c: string) => `${c.slice(0, 4)}-${c.slice(4)}`;
 
 const errText = (e: unknown) =>
   e instanceof ApiError && e.body && typeof e.body === "object" && "detail" in e.body
     ? String((e.body as { detail: unknown }).detail) : "Something went wrong";
 
-export default function Sharing() {
+function useSharingMutations() {
   const qc = useQueryClient();
-  const state = useQuery({ queryKey: ["sharing"], queryFn: () => apiGet<SharingState>("/sharing") });
-  const [code, setCode] = useState("");
-  const set = (s: SharingState) => qc.setQueryData(["sharing"], s);
-  const m = (fn: () => Promise<SharingState>, ok: string) => ({
+  const set = (s: SharingState) => {
+    qc.setQueryData(["sharing"], s);
+    qc.invalidateQueries({ queryKey: ["friends-calendar"] });
+  };
+  const wrap = <V,>(fn: (v: V) => Promise<SharingState>, ok?: (v: V) => string) => ({
     mutationFn: fn,
-    onSuccess: (s: SharingState) => { set(s); toast.success(ok); },
+    onSuccess: (s: SharingState, v: V) => { set(s); if (ok) toast.success(ok(v)); },
     onError: (e: unknown) => toast.error(errText(e)),
   });
+  return { wrap };
+}
 
-  const cats = useMutation({
-    mutationFn: (c: ShareCategory[]) => apiPut<SharingState>("/sharing/categories", { categories: c }),
-    onSuccess: set,
-    onError: (e) => toast.error(errText(e)),
-  });
-  const shopEdit = useMutation({
-    mutationFn: (enabled: boolean) => apiPut<SharingState>("/sharing/shopping-edit", { enabled }),
-    onSuccess: (st, enabled) => { set(st); toast.success(enabled ? "Friends can now tick off and add shopping items" : "Shopping list is view-only for friends"); },
-    onError: (e) => toast.error(errText(e)),
-  });
-  const regen = useMutation(m(() => apiPost<SharingState>("/sharing/code/regenerate"), "New friend code — the old one no longer works"));
-  const join = useMutation({
-    mutationFn: (c: string) => apiPost<SharingState>("/sharing/join", { code: c }),
-    onSuccess: (s) => { set(s); setCode(""); toast.success("Joined! Their shared planner is below"); },
-    onError: (e) => toast.error(errText(e)),
-  });
-  const removeMember = useMutation({
-    mutationFn: (id: string) => apiDelete<SharingState>(`/sharing/members/${id}`),
-    onSuccess: (s) => { set(s); toast.success("Removed — they can no longer see your planner"); },
-    onError: (e) => toast.error(errText(e)),
-  });
-  const leave = useMutation({
-    mutationFn: (id: string) => apiDelete<SharingState>(`/sharing/joined/${id}`),
-    onSuccess: (s) => { set(s); toast.success("Left that planner"); },
-    onError: (e) => toast.error(errText(e)),
-  });
+function BouquetCard({ b }: { b: Bouquet }) {
+  const { wrap } = useSharingMutations();
+  const [editing, setEditing] = useState(false);
+  const [name, setName] = useState(b.name);
+  const update = useMutation(wrap((u: BouquetUpdate) => apiPut<SharingState>(`/sharing/bouquets/${b.id}`, u)));
+  const regen = useMutation(wrap(() => apiPost<SharingState>(`/sharing/bouquets/${b.id}/code`), () => `New code for ${b.name} — the old one no longer works`));
+  const del = useMutation(wrap(() => apiDelete<SharingState>(`/sharing/bouquets/${b.id}`), () => `${b.name} removed`));
+  const remove = useMutation(wrap((id: string) => apiDelete<SharingState>(`/sharing/bouquets/${b.id}/members/${id}`), () => "Removed from this bouquet"));
+  const [confirmDel, setConfirmDel] = useState(false);
 
-  const s = state.data;
-  const selected = new Set(s?.categories ?? []);
+  const selected = new Set(b.categories);
   const everything = ALL.every((c) => selected.has(c));
-  const toggle = (c: ShareCategory, on: boolean) =>
-    cats.mutate(ALL.filter((x) => (x === c ? on : selected.has(x))));
+  const toggle = (c: ShareCategory, on: boolean) => update.mutate({ categories: ALL.filter((x) => (x === c ? on : selected.has(x))) });
   const copy = async () => {
-    if (!s) return;
-    try { await navigator.clipboard.writeText(s.friendCode); toast.success("Friend code copied"); }
+    try { await navigator.clipboard.writeText(b.code); toast.success(`${b.name} code copied`); }
     catch { toast.error("Couldn't copy — select the code and copy it"); }
   };
+  const tid = `bouquet-${b.id}`;
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6" data-testid="sharing-page">
-      <header>
-        <h1 className="font-heading text-3xl font-bold tracking-tight">Sharing &amp; friends</h1>
-        <p className="mt-1 text-muted-foreground">Give your friend code to people you trust. They can <b>view</b> the parts you choose — the shopping list is the only thing you can let them edit.</p>
-      </header>
-
-      <div className="grid gap-6 md:grid-cols-5">
-        <Card className="md:col-span-2" data-testid="friend-code-card">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 font-heading"><KeyRound className="size-4" /> Your friend code</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <p className="select-all rounded-2xl border bg-muted/40 py-4 text-center font-mono text-3xl font-bold tracking-[0.25em]" data-testid="friend-code">
-              {s ? `${s.friendCode.slice(0, 4)}-${s.friendCode.slice(4)}` : "····-····"}
-            </p>
-            <div className="flex gap-2">
-              <Button className="flex-1" size="sm" onClick={() => void copy()} disabled={!s} data-testid="friend-code-copy"><Copy className="size-4" /> Copy</Button>
-              <Button variant="outline" size="sm" onClick={() => regen.mutate()} disabled={regen.isPending} data-testid="friend-code-regenerate"
-                title="Make a new code; people already joined keep access"><RefreshCw className="size-4" /> New code</Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="md:col-span-3" data-testid="share-categories-card">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 font-heading"><Eye className="size-4" /> What friends can see</CardTitle>
-            <CardDescription>You&apos;re the admin of your planner — this applies to everyone who joined with your code.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <label className="flex items-center gap-2.5 rounded-xl border bg-muted/30 px-3 py-2 text-sm font-medium" htmlFor="share-everything">
-              <Checkbox id="share-everything" checked={everything} disabled={!s || cats.isPending}
-                onCheckedChange={(c) => cats.mutate(c === true ? ALL : [])} data-testid="share-everything" />
+    <motion.div layout initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: 0.97 }}>
+      <Card data-testid={tid} className="overflow-hidden">
+        <CardHeader className="flex flex-row flex-wrap items-center gap-3">
+          <Flower kind={flowerFor(b.id)} className="size-9 shrink-0" />
+          <div className="min-w-0 flex-1">
+            {editing ? (
+              <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); if (name.trim()) { update.mutate({ name: name.trim() }); setEditing(false); } }}>
+                <Input value={name} onChange={(e) => setName(e.target.value)} maxLength={40} autoFocus className="h-8" data-testid={`${tid}-name-input`} />
+                <Button type="submit" size="sm" disabled={!name.trim()} data-testid={`${tid}-name-save`}>Save</Button>
+              </form>
+            ) : (
+              <CardTitle className="flex items-center gap-1.5 font-heading text-lg" data-testid={`${tid}-name`}>
+                {b.name}
+                <button type="button" className="rounded p-1 text-muted-foreground transition-colors duration-150 hover:text-foreground" aria-label="Rename"
+                  onClick={() => { setName(b.name); setEditing(true); }} data-testid={`${tid}-rename`}><Pencil className="size-3.5" /></button>
+              </CardTitle>
+            )}
+            <CardDescription>{b.members.length} {b.members.length === 1 ? "person" : "people"} · {b.categories.length ? `${b.categories.length} shared` : "nothing shared yet"}</CardDescription>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="select-all rounded-xl border bg-muted/40 px-3 py-1.5 font-mono text-base font-bold tracking-[0.2em]" data-testid={`${tid}-code`}>{fmtCode(b.code)}</span>
+            <Button size="icon-sm" variant="outline" aria-label="Copy code" onClick={() => void copy()} data-testid={`${tid}-copy`}><Copy className="size-4" /></Button>
+            <Button size="icon-sm" variant="outline" aria-label="New code" title="New code — members stay" onClick={() => regen.mutate(undefined)} disabled={regen.isPending}
+              data-testid={`${tid}-regenerate`}><RefreshCw className="size-4" /></Button>
+          </div>
+        </CardHeader>
+        <CardContent className="grid gap-5 md:grid-cols-5">
+          <div className="space-y-2 md:col-span-3">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">What this bouquet sees</p>
+            <label htmlFor={`${tid}-everything`} className="flex items-center gap-2.5 rounded-xl border bg-muted/30 px-3 py-2 text-sm font-medium">
+              <Checkbox id={`${tid}-everything`} checked={everything} disabled={update.isPending}
+                onCheckedChange={(c) => update.mutate({ categories: c === true ? ALL : [] })} data-testid={`${tid}-share-everything`} />
               Everything
             </label>
             <div className="grid grid-cols-2 gap-2">
               {ALL.map((c) => (
-                <label key={c} htmlFor={`share-${c}`} className="flex items-center gap-2.5 rounded-xl border px-3 py-2 text-sm">
-                  <Checkbox id={`share-${c}`} checked={selected.has(c)} disabled={!s || cats.isPending}
-                    onCheckedChange={(v) => toggle(c, v === true)} data-testid={`share-${c}`} />
+                <label key={c} htmlFor={`${tid}-share-${c}`} className="flex items-center gap-2.5 rounded-xl border px-3 py-2 text-sm">
+                  <Checkbox id={`${tid}-share-${c}`} checked={selected.has(c)} disabled={update.isPending}
+                    onCheckedChange={(v) => toggle(c, v === true)} data-testid={`${tid}-share-${c}`} />
                   {SHARE_LABELS[c]}
                 </label>
               ))}
             </div>
-            {s && selected.has("shopping") && (
-              <label htmlFor="share-shopping-edit" className="flex items-start gap-2.5 rounded-xl border border-dashed px-3 py-2 text-sm">
-                <Checkbox id="share-shopping-edit" className="mt-0.5" checked={s.shoppingEdit} disabled={shopEdit.isPending}
-                  onCheckedChange={(v) => shopEdit.mutate(v === true)} data-testid="share-shopping-edit" />
-                <span><span className="block font-medium">Friends can tick off &amp; add shopping items</span>
+            {selected.has("shopping") && (
+              <label htmlFor={`${tid}-shopping-edit`} className="flex items-start gap-2.5 rounded-xl border border-dashed px-3 py-2 text-sm">
+                <Checkbox id={`${tid}-shopping-edit`} className="mt-0.5" checked={b.shoppingEdit} disabled={update.isPending}
+                  onCheckedChange={(v) => update.mutate({ shoppingEdit: v === true })} data-testid={`${tid}-shopping-edit`} />
+                <span><span className="block font-medium">Can tick off &amp; add shopping items</span>
                   <span className="block text-xs text-muted-foreground">Everything else stays view-only.</span></span>
               </label>
             )}
-            <p className="text-xs text-muted-foreground" data-testid="share-private-hint">Appointments marked Private show to friends as &ldquo;Unavailable&rdquo;.</p>
-            {s && selected.size === 0 && <p className="text-xs text-muted-foreground" data-testid="share-nothing">Nothing shared — friends who join see an empty page.</p>}
-          </CardContent>
-        </Card>
-      </div>
-
-      <Card data-testid="members-card">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 font-heading"><Users className="size-4" /> People viewing your planner</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {s?.members.length ? (
-            <ul className="divide-y" data-testid="members-list">
-              {s.members.map((p) => (
-                <li key={p.user_id} className="flex items-center gap-3 py-2" data-testid={`member-${p.user_id}`}>
-                  <Avatar name={p.name} picture={p.picture} />
-                  <span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium">{p.name}</span>
-                    <span className="block truncate text-xs text-muted-foreground">{p.email}</span></span>
-                  <Button variant="ghost" size="sm" onClick={() => removeMember.mutate(p.user_id)} disabled={removeMember.isPending}
-                    data-testid={`member-remove-${p.user_id}`}><UserMinus className="size-4" /> Remove</Button>
-                </li>
-              ))}
-            </ul>
-          ) : <p className="text-sm text-muted-foreground" data-testid="members-empty">No one yet — share your code to invite someone.</p>}
+          </div>
+          <div className="space-y-2 md:col-span-2">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">People</p>
+            {b.members.length ? (
+              <ul className="divide-y rounded-xl border" data-testid={`${tid}-members`}>
+                {b.members.map((p) => (
+                  <li key={p.user_id} className="flex items-center gap-2.5 px-3 py-2" data-testid={`${tid}-member-${p.user_id}`}>
+                    <Avatar name={p.name} picture={p.picture} />
+                    <span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium">{p.name}</span>
+                      <span className="block truncate text-xs text-muted-foreground">{p.email}</span></span>
+                    <Button variant="ghost" size="icon-sm" aria-label={`Remove ${p.name}`} onClick={() => remove.mutate(p.user_id)} disabled={remove.isPending}
+                      data-testid={`${tid}-member-remove-${p.user_id}`}><UserMinus className="size-4" /></Button>
+                  </li>
+                ))}
+              </ul>
+            ) : <p className="rounded-xl border border-dashed px-3 py-4 text-center text-sm text-muted-foreground" data-testid={`${tid}-members-empty`}>Share the code above to invite people.</p>}
+            <div className="flex justify-end pt-1">
+              {confirmDel ? (
+                <span className="flex items-center gap-2 text-xs">
+                  Delete {b.name}?
+                  <Button size="xs" variant="destructive" onClick={() => del.mutate(undefined)} disabled={del.isPending} data-testid={`${tid}-delete-confirm`}>Delete</Button>
+                  <Button size="xs" variant="ghost" onClick={() => setConfirmDel(false)} data-testid={`${tid}-delete-cancel`}>Keep</Button>
+                </span>
+              ) : (
+                <Button size="xs" variant="ghost" className="text-muted-foreground" onClick={() => setConfirmDel(true)} data-testid={`${tid}-delete`}>
+                  <Trash2 className="size-3.5" /> Delete bouquet
+                </Button>
+              )}
+            </div>
+          </div>
         </CardContent>
       </Card>
+    </motion.div>
+  );
+}
+
+export default function Sharing() {
+  const state = useQuery({ queryKey: ["sharing"], queryFn: () => apiGet<SharingState>("/sharing") });
+  const { wrap } = useSharingMutations();
+  const [newName, setNewName] = useState("");
+  const [code, setCode] = useState("");
+  const create = useMutation({
+    ...wrap((n: string) => apiPost<SharingState>("/sharing/bouquets", { name: n }), (n) => `${n} bouquet made — share its code`),
+    onSettled: () => setNewName(""),
+  });
+  const join = useMutation({
+    ...wrap((c: string) => apiPost<SharingState>("/sharing/join", { code: c }), () => "Joined! Their planner is below"),
+    onSettled: () => setCode(""),
+  });
+  const leave = useMutation(wrap((id: string) => apiDelete<SharingState>(`/sharing/joined/${id}`), () => "Left that planner"));
+  const s = state.data;
+
+  return (
+    <div className="mx-auto max-w-4xl space-y-6" data-testid="sharing-page">
+      <header className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 className="font-heading text-3xl font-bold tracking-tight">Bouquets</h1>
+          <p className="mt-1 max-w-xl text-muted-foreground">
+            Make a bouquet for each group — family, flatmates, work — and choose what each one sees. Every bouquet has its own code.
+            Appointments marked Private show as &ldquo;Unavailable&rdquo;.
+          </p>
+        </div>
+        <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); if (newName.trim()) create.mutate(newName.trim()); }}>
+          <Input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="New bouquet, e.g. Family" maxLength={40} className="w-56" data-testid="bouquet-new-input" />
+          <Button type="submit" disabled={!newName.trim() || create.isPending} data-testid="bouquet-new-button"><Plus className="size-4" /> Make</Button>
+        </form>
+      </header>
+
+      <div className="space-y-4" data-testid="bouquets-list">
+        <AnimatePresence initial={false}>
+          {s?.bouquets.map((b) => <BouquetCard key={b.id} b={b} />)}
+        </AnimatePresence>
+        {s && !s.bouquets.length && (
+          <div className="flex items-center gap-4 rounded-3xl border border-dashed p-6" data-testid="bouquets-empty">
+            <Flower kind="hibiscus" className="size-10 shrink-0" />
+            <p className="text-sm text-muted-foreground">No bouquets yet. Name one above (like &ldquo;Family&rdquo;), tick what it can see, then send its code to the people in it.</p>
+          </div>
+        )}
+      </div>
 
       <Card data-testid="joined-card">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 font-heading"><UserPlus className="size-4" /> Planners shared with you</CardTitle>
-          <CardDescription>Enter a friend&apos;s code to view their planner.</CardDescription>
+          <CardDescription>Enter a bouquet code to join it. Joining another bouquet keeps you in the ones you&apos;re already in.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); if (code.trim()) join.mutate(code.trim()); }}>
@@ -169,6 +210,9 @@ export default function Sharing() {
                   <Avatar name={p.name} picture={p.picture} />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm font-medium">{p.name}</span>
+                    <span className="block truncate text-xs text-muted-foreground" data-testid={`joined-bouquets-${p.user_id}`}>
+                      {p.bouquets.map((n) => `🌺 ${n}`).join("  ")}
+                    </span>
                     <span className="block truncate text-xs text-muted-foreground">
                       {p.categories.length ? p.categories.map((c) => SHARE_LABELS[c]).join(" · ") : "Nothing shared yet"}
                       {p.shoppingEdit && " · you can edit shopping"}
@@ -176,12 +220,12 @@ export default function Sharing() {
                   </span>
                   <Link to={`/shared/${p.user_id}`} className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-primary px-3 text-sm font-medium text-primary-foreground transition-opacity duration-150 hover:opacity-90"
                     data-testid={`joined-open-${p.user_id}`}><Eye className="size-4" /> View</Link>
-                  <Button variant="ghost" size="icon-sm" aria-label="Leave" onClick={() => leave.mutate(p.user_id)} disabled={leave.isPending}
+                  <Button variant="ghost" size="icon-sm" aria-label="Leave" title="Leave all their bouquets" onClick={() => leave.mutate(p.user_id)} disabled={leave.isPending}
                     data-testid={`joined-leave-${p.user_id}`}><LogOut className="size-4" /></Button>
                 </li>
               ))}
             </ul>
-          ) : <p className="text-sm text-muted-foreground" data-testid="joined-empty">You haven&apos;t joined anyone&apos;s planner yet.</p>}
+          ) : <p className="text-sm text-muted-foreground" data-testid="joined-empty">You haven&apos;t joined any bouquets yet.</p>}
         </CardContent>
       </Card>
     </div>

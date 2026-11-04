@@ -122,15 +122,19 @@ INDEXES: dict[str, list[IndexModel]] = {
     "users": [
         IndexModel([("email", ASCENDING)], name="email", unique=True),
         IndexModel([("user_id", ASCENDING)], name="user_id", unique=True),
-        IndexModel([("friendCode", ASCENDING)], name="friend_code", unique=True, sparse=True),
     ],
     "user_sessions": [
         IndexModel([("session_token", ASCENDING)], name="session_token", unique=True),
         IndexModel([("expires_at", ASCENDING)], name="expires_ttl", expireAfterSeconds=0),
     ],
-    "shares": [
-        IndexModel([("ownerId", ASCENDING), ("viewerId", ASCENDING)], name="owner_viewer", unique=True),
-        IndexModel([("viewerId", ASCENDING)], name="viewer"),
+    "bouquets": [
+        IndexModel([("id", ASCENDING)], name="id", unique=True),
+        IndexModel([("code", ASCENDING)], name="code", unique=True),
+        IndexModel([("ownerId", ASCENDING), ("createdAt", ASCENDING)], name="owner_created"),
+    ],
+    "bouquet_members": [
+        IndexModel([("bouquetId", ASCENDING), ("viewerId", ASCENDING)], name="bouquet_viewer", unique=True),
+        IndexModel([("viewerId", ASCENDING), ("ownerId", ASCENDING)], name="viewer_owner"),
     ],
     "cron_runs": [
         IndexModel([("runId", ASCENDING)], name="run_id", unique=True),
@@ -157,6 +161,17 @@ async def migrate_to_per_user() -> None:
         if res.deleted_count:
             logger.info("migrate: removed %d ownerless %s docs", res.deleted_count, coll)
     await raw_db.access.drop()
+    # Bouquets replace the single friend code: old links and codes are removed (agreed).
+    if "shares" in await raw_db.list_collection_names():
+        await raw_db.shares.drop()
+        logger.info("migrate: removed old friend-code shares")
+    try:
+        if "friend_code" in await raw_db.users.index_information():
+            await raw_db.users.drop_index("friend_code")
+    except Exception as exc:
+        logger.error("drop index users.friend_code: %s", exc)
+    await raw_db.users.update_many({"friendCode": {"$exists": True}},
+                                   {"$unset": {"friendCode": "", "shareCategories": "", "shoppingEdit": ""}})
 
 
 async def ensure_indexes() -> None:

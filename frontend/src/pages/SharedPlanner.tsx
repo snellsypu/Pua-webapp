@@ -1,9 +1,10 @@
 // View-only snapshot of a friend's planner — only the parts they chose to share.
 import { useState } from "react";
+import { FlowerTick, flowerFor } from "@/components/Flower";
 import { Link, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ArrowLeft, Check, Eye, Lock, MapPin, Pencil, Plus } from "lucide-react";
+import { ArrowLeft, Eye, Lock, MapPin, Pencil, Plus } from "lucide-react";
 import { apiGet, apiPatch, apiPost, ApiError } from "@/lib/api";
 import type { SharedPlanner, ShoppingItem } from "@/lib/types";
 import { Button } from "@/components/ui/button";
@@ -47,7 +48,7 @@ export default function SharedPlannerPage() {
       <div className="mx-auto max-w-xl space-y-3 py-10 text-center" data-testid="shared-error">
         <p className="font-heading text-xl font-bold">Can&apos;t open this planner</p>
         <p className="text-muted-foreground">{q.error instanceof ApiError && q.error.status === 404 ? "You don't have access — it may have been unshared." : "Try again in a moment."}</p>
-        <Link to="/sharing" className="text-sm text-primary underline">Back to Sharing</Link>
+        <Link to="/sharing" className="text-sm text-primary underline">Back to Bouquets</Link>
       </div>
     );
   }
@@ -55,7 +56,7 @@ export default function SharedPlannerPage() {
   return (
     <div className="space-y-6" data-testid="shared-planner-page">
       <Link to="/sharing" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors duration-150 hover:text-foreground" data-testid="shared-back">
-        <ArrowLeft className="size-4" /> Sharing
+        <ArrowLeft className="size-4" /> Bouquets
       </Link>
       <header className="flex flex-wrap items-center gap-4">
         {p && <Avatar name={p.owner.name} picture={p.owner.picture} size={10} />}
@@ -103,8 +104,8 @@ export default function SharedPlannerPage() {
             <ul className="space-y-1.5">
               {p.habits.map((h) => (
                 <li key={h.id} className="flex items-center gap-2 text-sm">
-                  <span className={cn("grid size-5 place-items-center rounded-full border", h.doneToday && "border-primary bg-primary text-primary-foreground")}>
-                    {h.doneToday && <Check className="size-3" />}</span>
+                  <span className={cn("grid size-5 place-items-center rounded-full border", h.doneToday && "border-transparent")}>
+                    {h.doneToday && <FlowerTick kind={flowerFor(h.id)} className="size-6" />}</span>
                   {h.emoji} {h.name}
                   <span className="ml-auto font-mono text-xs text-muted-foreground">{h.mode === "streak" ? `🔥 ${h.streak}` : `${h.monthCount}/${h.monthlyTarget}`}</span>
                 </li>

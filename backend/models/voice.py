@@ -19,6 +19,7 @@ class VoiceDraft(BaseModel):
     startTime: str | None = None  # appointment
     endTime: str | None = None  # appointment
     location: str = ""  # appointment
+    private: bool = False  # appointment — friends see "Unavailable"
     time: str | None = None  # reminder
     # habit
     emoji: str = "🎯"

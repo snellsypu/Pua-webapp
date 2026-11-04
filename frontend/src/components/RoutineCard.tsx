@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
+import { FlowerTick } from "@/components/Flower";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion } from "motion/react";
 import { toast } from "sonner";
-import { Bell, BellOff, Check, Flame, GripVertical, Moon, Pencil, Plus, Sunrise, X } from "lucide-react";
+import { Bell, BellOff, Flame, GripVertical, Moon, Pencil, Plus, Sunrise, X } from "lucide-react";
 import { apiPost, apiPut } from "@/lib/api";
 import type { RoutineState, RoutineUpdate } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
@@ -139,7 +140,7 @@ export function RoutineCard({
         )}
         {routine.complete ? (
           <p className="flex items-center gap-1.5 text-sm font-medium text-primary" data-testid={`routine-complete-${routine.kind}`}>
-            <Check className="size-4" /> All done for today
+            <FlowerTick kind="hibiscus" className="size-5" /> All done for today
           </p>
         ) : (
           total > 0 && <HandsFreeRoutine kind={routine.kind as "morning" | "bedtime"} />

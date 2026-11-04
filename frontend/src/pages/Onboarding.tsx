@@ -1,9 +1,10 @@
 // First sign-in: a sample planner (demo data), ready-made starter packs, or a clear planner.
 import { useState } from "react";
+import { FlowerTick, flowerFor } from "@/components/Flower";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "motion/react";
 import { toast } from "sonner";
-import { Check, Loader2, Package, Sparkles, Sprout } from "lucide-react";
+import { Loader2, Package, Sparkles, Sprout } from "lucide-react";
 import { apiPost } from "@/lib/api";
 import type { AuthUser, OnboardIn, StarterPack } from "@/lib/types";
 import { useMe } from "@/lib/auth";
@@ -92,7 +93,7 @@ export default function Onboarding() {
                           className={cn("relative rounded-2xl border p-3 text-left transition-[background-color,border-color,transform] duration-150 active:scale-[0.98]",
                             on ? "border-sky-500/60 bg-sky-500/10" : "hover:bg-accent")}>
                           <span className={cn("absolute right-2.5 top-2.5 grid size-5 place-items-center rounded-full border transition-colors duration-150",
-                            on && "border-sky-500 bg-sky-500 text-white")}>{on && <Check className="size-3" />}</span>
+                            on && "border-transparent")}>{on && <FlowerTick kind={flowerFor(p.id)} className="size-6" />}</span>
                           <span className="block text-sm font-semibold">{p.emoji} {p.title}</span>
                           <span className="mt-1 block pr-4 text-xs leading-relaxed text-muted-foreground">{p.items}</span>
                         </button>
