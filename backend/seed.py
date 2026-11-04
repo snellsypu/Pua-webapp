@@ -18,8 +18,9 @@ def now() -> datetime:
 
 async def main() -> None:
     await ensure_indexes()
+    await seed_health()
     if await db.habits.count_documents({}) > 0:
-        print("seed: data already present — skipping")
+        print("seed: core data already present — skipping")
         return
 
     await db.settings.update_one(
@@ -105,6 +106,38 @@ async def main() -> None:
 
     print(f"seed: planted habits={len(habits)} completions={len(completions)} "
           f"appointments=5 meals={len(meals)} reminders=3 shopping=5 (today={today_iso()})")
+
+
+async def seed_health() -> None:
+    """Samsung Health demo events — own guard so it runs on an already-seeded DB."""
+    if await db.health_events.count_documents({}) == 0:
+        today_dt = date.fromisoformat(today_iso())
+        yesterday = (today_dt - timedelta(days=1)).isoformat()
+        wake = today_iso()
+        health_events = [
+            {"eventId": "seed-sleep-1", "type": "sleep", "date": wake,
+             "start": f"{yesterday}T23:10:00+00:00", "end": f"{wake}T06:45:00+00:00",
+             "title": "Sleep", "durationMin": 455.0, "calories": None, "proteinG": None,
+             "carbsG": None, "fatG": None, "stage": None, "score": 88.0,
+             "sourceFile": "com.samsung.health.sleep_combined.1.csv"},
+            {"eventId": "seed-exercise-1", "type": "exercise", "date": yesterday,
+             "start": f"{yesterday}T07:15:00+00:00", "end": f"{yesterday}T07:52:00+00:00",
+             "title": "Running", "durationMin": 37.0, "calories": 320.0, "proteinG": None,
+             "carbsG": None, "fatG": None, "stage": None, "score": None,
+             "sourceFile": "com.samsung.health.exercise.1.csv"},
+            {"eventId": "seed-nutrition-1", "type": "nutrition", "date": yesterday,
+             "start": f"{yesterday}T08:10:00+00:00", "end": f"{yesterday}T08:10:00+00:00",
+             "title": "Oatmeal with banana", "durationMin": None, "calories": 420.0,
+             "proteinG": 12.0, "carbsG": 71.0, "fatG": 9.0, "stage": None, "score": None,
+             "sourceFile": "com.samsung.health.food_intake.1.csv"},
+            {"eventId": "seed-nutrition-2", "type": "nutrition", "date": yesterday,
+             "start": f"{yesterday}T12:45:00+00:00", "end": f"{yesterday}T12:45:00+00:00",
+             "title": "Chicken salad", "durationMin": None, "calories": 560.0,
+             "proteinG": 38.0, "carbsG": 24.0, "fatG": 29.0, "stage": None, "score": None,
+             "sourceFile": "com.samsung.health.food_intake.1.csv"},
+        ]
+        await db.health_events.insert_many(health_events)
+        print("seed: planted 4 Samsung Health demo events")
 
 
 if __name__ == "__main__":

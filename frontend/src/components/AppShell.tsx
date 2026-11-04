@@ -2,6 +2,7 @@ import { Link, NavLink, Outlet } from "react-router-dom";
 import { MotionConfig } from "motion/react";
 import {
   CalendarDays,
+  HeartPulse,
   ListChecks,
   MoonStar,
   Settings as SettingsIcon,
@@ -13,12 +14,14 @@ import { Toaster } from "@/components/ui/sonner";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { CreateFab } from "@/components/CreateFab";
 
 const NAV = [
   { to: "/", label: "Today", icon: SunMedium, testid: "nav-today" },
   { to: "/calendar", label: "Calendar", icon: CalendarDays, testid: "nav-calendar" },
   { to: "/habits", label: "Habits", icon: ListChecks, testid: "nav-habits" },
   { to: "/planner", label: "Planner", icon: UtensilsCrossed, testid: "nav-planner" },
+  { to: "/health", label: "Health", icon: HeartPulse, testid: "nav-health" },
 ];
 
 export default function AppShell() {
@@ -94,11 +97,13 @@ export default function AppShell() {
             </div>
           </div>
         </header>
-        <main className="mx-auto w-full max-w-6xl px-4 pb-24 pt-6">
+        <main className="mx-auto w-full max-w-6xl px-4 pb-28 pt-6">
           <Outlet />
         </main>
       </div>
-      <Toaster richColors />
+      <CreateFab />
+      {/* Lifted above the FAB so toasts never cover the create button */}
+      <Toaster richColors offset={{ bottom: 96, right: 24 }} mobileOffset={{ bottom: 92 }} />
     </MotionConfig>
   );
 }

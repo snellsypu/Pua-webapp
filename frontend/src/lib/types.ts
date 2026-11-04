@@ -156,3 +156,29 @@ export interface ReversePlace {
   latitude: number;
   longitude: number;
 }
+
+// Mirrors backend/models/health.py
+export type HealthType = "nutrition" | "exercise" | "sleep";
+
+export interface HealthEvent {
+  eventId: string;
+  type: HealthType;
+  date: string;
+  start: string;
+  end: string;
+  title: string | null;
+  durationMin: number | null;
+  calories: number | null;
+  proteinG: number | null;
+  carbsG: number | null;
+  fatG: number | null;
+  stage: string | null;
+  score: number | null;
+  sourceFile: string;
+}
+
+export interface HealthImportResult {
+  imported: number;
+  byType: Record<string, number>;
+  files: string[];
+}

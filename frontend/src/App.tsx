@@ -7,6 +7,7 @@ import Planner from "@/pages/Planner";
 import Morning from "@/pages/Morning";
 import Evening from "@/pages/Evening";
 import Settings from "@/pages/Settings";
+import Health from "@/pages/Health";
 import NotFound from "@/pages/NotFound";
 
 // One <Route> per page in src/pages; BrowserRouter already wraps this in main.tsx.
@@ -21,6 +22,7 @@ export default function App() {
         <Route path="/morning" element={<Morning />} />
         <Route path="/evening" element={<Evening />} />
         <Route path="/settings" element={<Settings />} />
+        <Route path="/health" element={<Health />} />
         <Route path="*" element={<NotFound />} />
       </Route>
     </Routes>

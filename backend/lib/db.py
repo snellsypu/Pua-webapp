@@ -31,6 +31,10 @@ INDEXES: dict[str, list[IndexModel]] = {
         IndexModel([("checked", ASCENDING), ("createdAt", DESCENDING)], name="checked_created")
     ],
     "reminders": [IndexModel([("date", ASCENDING), ("time", ASCENDING)], name="date_time")],
+    "health_events": [
+        IndexModel([("eventId", ASCENDING)], name="event_id", unique=True),
+        IndexModel([("date", ASCENDING), ("start", ASCENDING)], name="date_start"),
+    ],
 }
 
 

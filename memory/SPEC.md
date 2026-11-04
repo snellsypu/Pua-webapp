@@ -49,13 +49,33 @@ tomorrow's preview). Public URL: https://daily-loop-8--68ipsq2d.preview.emergent
 - `/evening` — violet review: scorecard badges, today recap, tomorrow preview (weather,
   appointments, meals, reminders + quick add for tomorrow).
 - `/settings` — home city search/detect, light/dark/system theme (next-themes), units.
+- **Create FAB** (`components/CreateFab.tsx`, mounted in AppShell on every page) — bottom-right
+  "+" opens a menu: Reminder / Habit / Appointment, each opening its dialog with the date
+  pre-filled from the server's today. Toaster is offset upward (bottom 96px) so toasts never
+  cover it. Habit dialog is shared (`components/HabitDialog.tsx`) with the Habits page.
+- `/health` — **Samsung Health import**. Samsung has NO public web/REST API (its data SDK is
+  Android-native only), so integration = user-initiated export: Samsung Health → Settings →
+  Download personal data → upload ZIP. `POST /api/health/import` (multipart, `apiUpload` in
+  lib/api.ts) parses CSV/JSON/XLSX entries by filename fragment (food_intake/nutrition,
+  exercise, sleep_combined/sleep), skips the "com.samsung…" metadata line above CSV headers,
+  converts ms durations to minutes, upserts by deterministic sha256 `eventId` (re-import =
+  no duplicates). Limits: 50 MB upload, 150 MB uncompressed, 200 files; non-ZIP → 400; no
+  matching records → 400. `GET /api/health/events?from&to` (by display `date`; sleep uses
+  the wake-up day), `DELETE /api/health/events` clears all imported data. Page shows the
+  last 14 days grouped by day with kcal-eaten totals.
+
+## Health data model
+- `health_events`: eventId (unique), type (nutrition|exercise|sleep), date, start, end,
+  title, durationMin, calories, proteinG, carbsG, fatG, stage, score, sourceFile.
 
 ## Seed / demo data (`backend/seed.py`, idempotent, skips if habits exist)
 Home = New York; 4 habits (Read 20 pages 📚, Morning run 🏃 streaks; Meditate 🧘; Gym 🏋️
 monthly target 12) with completions in the past days; appointments today (Team standup
 09:30, Dentist 14:00), tomorrow (Project review 10:00, Dinner with Maya 19:00), +3d train;
 meals today + tomorrow; reminders (Call the plumber today 16:00, Pack gym bag tomorrow,
-Book train tickets +2d); 5 shopping items (1 bought).
+Book train tickets +2d); 5 shopping items (1 bought). Health (`seed_health()`, own guard,
+runs even on an already-seeded DB): last night's sleep (7h35m, score 88), yesterday's
+Running 37 min/320 kcal, yesterday's Oatmeal 420 kcal + Chicken salad 560 kcal.
 
 ## Auth
 None — single-user local app, no login, no credentials (see memory/test_credentials.md).
