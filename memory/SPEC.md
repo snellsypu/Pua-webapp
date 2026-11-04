@@ -223,20 +223,32 @@ Book train tickets +2d); 5 shopping items (1 bought). Health (`seed_health()`, o
 runs even on an already-seeded DB): last night's sleep (7h35m, score 88), yesterday's
 Running 37 min/320 kcal, yesterday's Oatmeal 420 kcal + Chicken salad 560 kcal.
 
-## Auth
+## Auth, private planners & sharing
 Emergent-managed Google sign-in (lib/auth.py, routers/auth.py, frontend lib/auth.tsx).
-- Single shared planner + allow-list: `access` doc {id, owner, emails[]}. First Google sign-in
-  claims ownership (atomic); afterwards only listed emails may sign in (403 otherwise, shown on
-  the sign-in page). Owner manages the list in Settings → Who has access (`AccessCard`,
-  GET/POST `/api/auth/access`, DELETE `/api/auth/access/{email}`; owner can't be removed).
-- Flow: SignIn "Continue with Google" → auth.emergentagent.com?redirect=<current page URL,
-  derived from window.location> → back at `<page>#session_id=…` → AuthGate (reads
-  `useLocation().hash`) renders AuthCallback → POST `/api/auth/session` (backend calls Emergent
-  session-data) → users upsert (custom user_id) + user_sessions (7 days, TTL index) + httpOnly
-  `session_token` cookie (secure, SameSite=None) → navigate to the same page without the hash.
-- Gate: `api_router = APIRouter(prefix="/api", dependencies=[Depends(require_user)])`; public:
-  /api/auth/session, /api/auth/me (401 when signed out), /api/auth/logout, /api/cron/routines
-  (own secret). Sessions are re-checked against the allow-list on every request.
-- Frontend: AuthGate wraps all routes (splash → SignIn or app); any 401 re-checks /auth/me;
-  header AccountButton (avatar, name, email, Owner badge, Who has access, Sign out).
+- **Any Google account** signs in; sessions effectively never expire (10-year DB expiry; the
+  httpOnly cookie, max 400 days, is re-set on every `/auth/me`) — signed in until Sign out.
+- **Per-user data**: `lib/db.db` is a ScopedDB — every planner collection in `SCOPED`
+  (settings, appointments, habits, habit_completions, meals, shopping_items, reminders,
+  health_events, routines, routine_checks, push_subscriptions) auto-adds
+  `ownerId = current_owner` (ContextVar) to filters/inserts; no owner → RuntimeError.
+  `require_user` (api_router dependency) sets it; the cron loops over onboarded users setting
+  it per user; `raw_db` is unscoped (users, user_sessions, shares, caches). Unique indexes
+  are per owner. Startup migration dropped old global indexes + ownerless legacy data.
+- **First sign-in**: `AuthUser.onboarded=false` → Onboarding page: Sample planner
+  (seed.run_all under the user's scope) or Clear planner (routines with no steps) →
+  POST `/api/auth/onboard {sample}`.
+- **Friend codes / sharing (view-only)**: users have `friendCode` (8 chars, no 0/O/1/I,
+  shown ABCD-2345) and `shareCategories` ⊆ appointments, reminders, habits, routines, meals,
+  shopping (admin = planner owner; "Everything" = all). `shares` {ownerId, viewerId}.
+  `/api/sharing`: GET state {friendCode, categories, members, joined}; PUT /categories;
+  POST /code/regenerate (old code stops, members stay); POST /join {code} (404 unknown,
+  400 own); DELETE /members/{viewerId} (admin removes); DELETE /joined/{ownerId} (leave);
+  GET /planner/{ownerId} → SharedPlanner snapshot (404 without a link) built by calling the
+  normal list handlers under the owner's scope: appointments/reminders today+13 d, habits,
+  routines today, meals this week, shopping — only shared categories (others null).
+- Frontend: AuthGate (splash → SignIn → Onboarding → app; any 401 re-checks /auth/me);
+  /sharing page (code + copy/new, category checkboxes, members, join, joined planners) and
+  /shared/:ownerId read-only page ("View only" badge); header AccountButton (Sharing &
+  friends, Sign out); nav "Sharing".
+- Device-local prefs (wake/bedtime first-open, spoken replies, wake word) stay per device.
 - Testing: /app/auth_testing.md + memory/test_credentials.md.

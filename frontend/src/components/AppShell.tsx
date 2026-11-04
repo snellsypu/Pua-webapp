@@ -5,6 +5,7 @@ import { MotionConfig } from "motion/react";
 import {
   CalendarDays,
   HeartPulse,
+  Users,
   ListChecks,
   MoonStar,
   Settings as SettingsIcon,
@@ -30,6 +31,7 @@ const NAV = [
   { to: "/habits", label: "Habits", icon: ListChecks, testid: "nav-habits" },
   { to: "/planner", label: "Planner", icon: UtensilsCrossed, testid: "nav-planner" },
   { to: "/health", label: "Health", icon: HeartPulse, testid: "nav-health" },
+  { to: "/sharing", label: "Sharing", icon: Users, testid: "nav-sharing" },
 ];
 
 export default function AppShell() {

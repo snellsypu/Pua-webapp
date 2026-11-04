@@ -1,28 +1,20 @@
-"""Sign-in endpoints (Emergent-managed Google auth) + the owner's allow-list."""
+"""Sign-in endpoints (Emergent-managed Google auth) + first-run planner choice."""
 
 import httpx
 from fastapi import APIRouter, HTTPException, Request, Response
 
 from lib.auth import (
-    SESSION_COOKIE, SESSION_DATA_URL, SESSION_DAYS, create_session, current_user, get_access,
-    may_sign_in, session_token_from,
+    SESSION_COOKIE, SESSION_DATA_URL, create_session, current_user, session_token_from, set_session_cookie,
 )
-from lib.db import db
-from models.auth import AccessAdd, AccessList, AuthUser, SessionIn
+from lib.db import current_owner, raw_db
+from models.auth import AuthUser, OnboardIn, SessionIn
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
-def _set_cookie(response: Response, token: str) -> None:
-    response.set_cookie(
-        SESSION_COOKIE, token, max_age=SESSION_DAYS * 86400, path="/",
-        httponly=True, secure=True, samesite="none",
-    )
-
-
 @router.post("/session", response_model=AuthUser)
 async def exchange_session(input: SessionIn, response: Response):
-    """Swap the one-time session_id from the auth redirect for a 7-day session cookie."""
+    """Swap the one-time session_id from the auth redirect for the session cookie."""
     async with httpx.AsyncClient(timeout=15) as client:
         res = await client.get(SESSION_DATA_URL, headers={"X-Session-ID": input.session_id})
     if res.status_code != 200:
@@ -31,20 +23,19 @@ async def exchange_session(input: SessionIn, response: Response):
     email = (data.get("email") or "").strip().lower()
     if not email or not data.get("session_token"):
         raise HTTPException(status_code=401, detail="Sign-in failed — please try again")
-    if not await may_sign_in(email):
-        raise HTTPException(status_code=403, detail=f"{email} isn't allowed to use this PUA. Ask the owner to add you.")
-    await create_session({**data, "email": email}, data["session_token"])
-    _set_cookie(response, data["session_token"])
-    user = await db.users.find_one({"email": email}, {"_id": 0})
-    acc = await get_access()
-    return AuthUser(**user, isOwner=email == acc.get("owner"))
+    user = await create_session({**data, "email": email}, data["session_token"])
+    set_session_cookie(response, data["session_token"])
+    return AuthUser(**user)
 
 
 @router.get("/me", response_model=AuthUser)
-async def me(request: Request):
+async def me(request: Request, response: Response):
     user = await current_user(request)
     if not user:
         raise HTTPException(status_code=401, detail="Not signed in")
+    token = session_token_from(request)
+    if token and request.cookies.get(SESSION_COOKIE):
+        set_session_cookie(response, token)  # slide the cookie so you stay signed in
     return AuthUser(**user)
 
 
@@ -52,38 +43,31 @@ async def me(request: Request):
 async def logout(request: Request, response: Response):
     token = session_token_from(request)
     if token:
-        await db.user_sessions.delete_one({"session_token": token})
+        await raw_db.user_sessions.delete_one({"session_token": token})
     response.delete_cookie(SESSION_COOKIE, path="/", secure=True, samesite="none")
     return {"ok": True}
 
 
-async def _owner(request: Request) -> dict:
-    user = await current_user(request)
-    if not user or not user.get("isOwner"):
-        raise HTTPException(status_code=403, detail="Only the owner can change who has access")
-    return user
+@router.post("/onboard", response_model=AuthUser)
+async def onboard(input: OnboardIn, request: Request):
+    """First sign-in: fill the new planner with sample data, or start clear."""
+    user = request.state.user
+    if user.get("onboarded"):
+        return AuthUser(**user)
+    assert current_owner.get() == user["user_id"]
+    if input.sample:
+        import seed
 
+        await seed.run_all()
+    else:
+        from routers.routines import DEFAULTS, ROUTINE_KINDS
 
-@router.get("/access", response_model=AccessList)
-async def get_access_list():
-    acc = await get_access()
-    return AccessList(owner=acc.get("owner"), emails=acc.get("emails", []))
+        for kind in ROUTINE_KINDS:  # routines exist but start with no steps
+            from lib.db import db
 
-
-@router.post("/access", response_model=AccessList)
-async def add_access(input: AccessAdd, request: Request):
-    await _owner(request)
-    email = input.email.strip().lower()
-    await db.access.update_one({"id": "access"}, {"$addToSet": {"emails": email}})
-    return await get_access_list()
-
-
-@router.delete("/access/{email}", response_model=AccessList)
-async def remove_access(email: str, request: Request):
-    owner = await _owner(request)
-    email = email.strip().lower()
-    if email == owner["email"]:
-        raise HTTPException(status_code=400, detail="The owner can't be removed")
-    await db.access.update_one({"id": "access"}, {"$pull": {"emails": email}})
-    # their sessions stop working at once (current_user re-checks the list)
-    return await get_access_list()
+            if not await db.routines.find_one({"kind": kind}):
+                d = DEFAULTS[kind]
+                await db.routines.insert_one({"kind": kind, "title": d["title"], "time": d["time"],
+                                              "notify": False, "steps": [], "lastNotifiedDate": None})
+    await raw_db.users.update_one({"user_id": user["user_id"]}, {"$set": {"onboarded": True}})
+    return AuthUser(**{**user, "onboarded": True})

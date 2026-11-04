@@ -10,6 +10,7 @@ import { Loader2 } from "lucide-react";
 import { apiGet, apiPost, ApiError } from "@/lib/api";
 import type { AuthUser } from "@/lib/types";
 import SignIn from "@/pages/SignIn";
+import Onboarding from "@/pages/Onboarding";
 
 export const AUTH_ERROR_KEY = "pua:auth-error";
 
@@ -93,5 +94,6 @@ export function AuthGate({ children }: { children: ReactNode }) {
   if (callback) return <AuthCallback />;
   if (me.isLoading) return <Splash />;
   if (!me.data) return <SignIn />;
+  if (!me.data.onboarded) return <Onboarding />;
   return <>{children}</>;
 }

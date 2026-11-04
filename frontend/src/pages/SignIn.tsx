@@ -58,7 +58,7 @@ export default function SignIn() {
           <GoogleMark /> Continue with Google
         </Button>
         <p className="mt-3 text-center text-xs text-muted-foreground">
-          Private planner — only accounts the owner has added can sign in.
+          Your own private planner · you stay signed in until you sign out.
         </p>
       </motion.main>
     </div>

@@ -8,6 +8,8 @@ import Overview from "@/pages/Overview";
 import Settings from "@/pages/Settings";
 import Health from "@/pages/Health";
 import NotFound from "@/pages/NotFound";
+import Sharing from "@/pages/Sharing";
+import SharedPlannerPage from "@/pages/SharedPlanner";
 import { AuthGate } from "@/lib/auth";
 
 // One <Route> per page in src/pages; BrowserRouter already wraps this in main.tsx.
@@ -26,6 +28,8 @@ export default function App() {
         <Route path="/evening" element={<Navigate to="/overview?view=tomorrow" replace />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="/health" element={<Health />} />
+        <Route path="/sharing" element={<Sharing />} />
+        <Route path="/shared/:ownerId" element={<SharedPlannerPage />} />
         <Route path="*" element={<NotFound />} />
       </Route>
     </Routes>

@@ -2,7 +2,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { LogOut, Settings as SettingsIcon } from "lucide-react";
+import { LogOut, Users } from "lucide-react";
 import { apiPost } from "@/lib/api";
 import { useMe } from "@/lib/auth";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -51,12 +51,11 @@ export function AccountButton() {
           <div className="min-w-0">
             <p className="truncate font-medium" data-testid="account-name">{u.name}</p>
             <p className="truncate text-xs text-muted-foreground" data-testid="account-email">{u.email}</p>
-            {u.isOwner && <p className="text-[11px] font-medium text-primary" data-testid="account-owner-badge">Owner</p>}
           </div>
         </div>
         <div className="grid gap-1.5">
-          <Button variant="outline" size="sm" onClick={() => navigate("/settings#access")} data-testid="account-manage-access">
-            <SettingsIcon className="size-4" /> Who has access
+          <Button variant="outline" size="sm" onClick={() => navigate("/sharing")} data-testid="account-sharing">
+            <Users className="size-4" /> Sharing &amp; friends
           </Button>
           <Button variant="ghost" size="sm" disabled={logout.isPending} onClick={() => logout.mutate()} data-testid="account-signout">
             <LogOut className="size-4" /> Sign out

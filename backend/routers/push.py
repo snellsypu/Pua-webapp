@@ -144,6 +144,20 @@ async def _run_reminder(settings: dict, now_local: datetime) -> None:
 
 
 async def run_routine_notifications() -> None:
+    """Cron: run every signed-up user's notifications inside their own planner scope."""
+    from lib.db import current_owner, raw_db
+
+    async for u in raw_db.users.find({"onboarded": True}, {"user_id": 1}):
+        token = current_owner.set(u["user_id"])
+        try:
+            await _run_for_owner()
+        except Exception:
+            logger.exception("notifications failed for %s", u["user_id"])
+        finally:
+            current_owner.reset(token)
+
+
+async def _run_for_owner() -> None:
     settings = await db.settings.find_one({"id": "app"}) or {}
     try:
         tz = ZoneInfo(settings.get("timezone") or "UTC")

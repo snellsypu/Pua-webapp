@@ -371,10 +371,38 @@ export interface AuthUser {
   email: string;
   name: string;
   picture: string;
-  isOwner: boolean;
+  onboarded: boolean; // false until the first-run sample/clear choice
 }
 
-export interface AccessList {
-  owner: string | null;
-  emails: string[];
+export type ShareCategory = "appointments" | "reminders" | "habits" | "routines" | "meals" | "shopping";
+
+export interface Person {
+  user_id: string;
+  name: string;
+  email: string;
+  picture: string;
+}
+
+export interface JoinedPlanner extends Person {
+  categories: ShareCategory[];
+}
+
+export interface SharingState {
+  friendCode: string;
+  categories: ShareCategory[];
+  members: Person[];
+  joined: JoinedPlanner[];
+}
+
+// Mirrors backend/models/sharing.py — view-only snapshot of a friend's planner
+export interface SharedPlanner {
+  owner: Person;
+  categories: ShareCategory[];
+  today: string;
+  appointments: Appointment[] | null;
+  reminders: Reminder[] | null;
+  habits: HabitStats[] | null;
+  routines: RoutineState[] | null;
+  meals: Meal[] | null;
+  shopping: ShoppingItem[] | null;
 }

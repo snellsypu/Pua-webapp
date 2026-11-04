@@ -17,7 +17,6 @@ def now() -> datetime:
 
 
 async def main() -> None:
-    await ensure_indexes()
     await seed_health()
     if await db.habits.count_documents({}) > 0:
         print("seed: core data already present — skipping")
