@@ -4,11 +4,12 @@ import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Loader2, Lock, Plus, ShoppingCart, Sparkles, Trash2, X } from "lucide-react";
-import { apiDelete, apiGet, apiPost } from "@/lib/api";
-import type { Meal, MealSlot, MealUpsert, Recipe, ShoppingSuggestion } from "@/lib/types";
+import { apiDelete, apiGet, apiPost, apiPut } from "@/lib/api";
+import type { AppSettings, FavouriteMeal, Person, Meal, MealSlot, MealUpsert, Recipe, ShoppingSuggestion } from "@/lib/types";
 import { addDaysIso, fmtShort } from "@/lib/dates";
 import { usePaywall, usePremium } from "@/components/Paywall";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -24,13 +25,13 @@ export const SLOTS: { slot: MealSlot; label: string; emoji: string }[] = [
 export function useInvalidateMeals() {
   const qc = useQueryClient();
   return () => {
-    for (const k of ["meals-week", "meal-suggestions", "overview", "range"]) qc.invalidateQueries({ queryKey: [k] });
+    for (const k of ["meals-week", "meal-suggestions", "meal-favourites", "overview", "range"]) qc.invalidateQueries({ queryKey: [k] });
   };
 }
 
 type Target = { date: string; slot: MealSlot; meal?: Meal };
 
-function MealDialog({ target, onClose }: { target: Target | null; onClose: () => void }) {
+function MealDialog({ base, target, onClose }: { base: string; target: Target | null; onClose: () => void }) {
   const invalidate = useInvalidateMeals();
   const premium = usePremium();
   const openPaywall = usePaywall();
@@ -47,6 +48,12 @@ function MealDialog({ target, onClose }: { target: Target | null; onClose: () =>
   }, [target]);
 
   const slotInfo = SLOTS.find((s) => s.slot === target?.slot);
+  const favs = useQuery({
+    queryKey: ["meal-favourites", base, target?.slot],
+    queryFn: () => apiGet<FavouriteMeal[]>(`${base}/favourites?slot=${target!.slot}`),
+    enabled: !!target,
+  });
+  const pickFavourite = (f: FavouriteMeal) => { setTitle(f.title); setItems(f.ingredients); setRemembered(f.ingredients.length > 0); };
   const addItem = (t: string) => {
     const v = t.trim();
     if (v && !items.some((i) => i.toLowerCase() === v.toLowerCase())) setItems((xs) => [...xs, v]);
@@ -54,7 +61,7 @@ function MealDialog({ target, onClose }: { target: Target | null; onClose: () =>
   const recall = async () => {
     const t = title.trim();
     if (!t || items.length || t === target?.meal?.title) return;
-    const r = await apiGet<Recipe>(`/meals/recipe?title=${encodeURIComponent(t)}`).catch(() => null);
+    const r = await apiGet<Recipe>(`${base}/recipe?title=${encodeURIComponent(t)}`).catch(() => null);
     if (r?.ingredients.length) { setItems(r.ingredients); setRemembered(true); }
   };
   const guess = useMutation({
@@ -68,13 +75,13 @@ function MealDialog({ target, onClose }: { target: Target | null; onClose: () =>
   const save = useMutation({
     mutationFn: () => {
       const body: MealUpsert = { date: target!.date, slot: target!.slot, title: title.trim(), notes: target!.meal?.notes ?? "", ingredients: items };
-      return apiPost<Meal>("/meals", body);
+      return apiPost<Meal>(base, body);
     },
     onSuccess: () => { invalidate(); toast.success(`${slotInfo?.label} planned`); onClose(); },
     onError: () => toast.error("Could not save the meal"),
   });
   const remove = useMutation({
-    mutationFn: () => apiDelete(`/meals/${target!.meal!.id}`),
+    mutationFn: () => apiDelete(`${base}/${target!.meal!.id}`),
     onSuccess: () => { invalidate(); toast.success(`${slotInfo?.label} cleared`); onClose(); },
     onError: () => toast.error("Could not clear the meal"),
   });
@@ -92,6 +99,23 @@ function MealDialog({ target, onClose }: { target: Target | null; onClose: () =>
             <Input id="meal-title" value={title} onChange={(e) => setTitle(e.target.value)} onBlur={recall}
               placeholder="e.g. Spaghetti bolognese" autoFocus data-testid="meal-dialog-title-input" />
           </div>
+          {!!favs.data?.length && (
+            <div className="space-y-1.5" data-testid="meal-dialog-favourites">
+              <p className="text-xs font-medium text-muted-foreground">Favourites</p>
+              <ul className="flex flex-wrap gap-1.5">
+                {favs.data.map((f) => (
+                  <li key={f.title}>
+                    <button type="button" onClick={() => pickFavourite(f)}
+                      className={cn("rounded-full px-2.5 py-1 text-xs ring-1 ring-border transition-[background-color,transform] duration-150 hover:bg-accent active:scale-95",
+                        title.trim().toLowerCase() === f.title.toLowerCase() && "bg-primary text-primary-foreground ring-primary")}
+                      data-testid={`meal-favourite-${f.title}`}>
+                      ⭐ {f.title} <span className="opacity-60">×{f.count}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           <div className="space-y-1.5">
             <div className="flex items-center justify-between gap-2">
               <Label htmlFor="meal-ingredient">Ingredients</Label>
@@ -139,11 +163,12 @@ function MealDialog({ target, onClose }: { target: Target | null; onClose: () =>
   );
 }
 
-export function MealWeek({ weekStart, today }: { weekStart: string; today: string }) {
+/** base = "/meals" (my plan) or "/sharing/planner/<ownerId>/meals" (a bouquet's shared plan) */
+export function MealWeek({ base, weekStart, today }: { base: string; weekStart: string; today: string }) {
   const weekEnd = addDaysIso(weekStart, 6);
   const q = useQuery({
-    queryKey: ["meals-week", weekStart],
-    queryFn: () => apiGet<Meal[]>(`/meals?from=${weekStart}&to=${weekEnd}`),
+    queryKey: ["meals-week", base, weekStart],
+    queryFn: () => apiGet<Meal[]>(`${base}?from=${weekStart}&to=${weekEnd}`),
   });
   const [target, setTarget] = useState<Target | null>(null);
   const days = Array.from({ length: 7 }, (_, i) => addDaysIso(weekStart, i));
@@ -179,17 +204,17 @@ export function MealWeek({ weekStart, today }: { weekStart: string; today: strin
           );
         })}
       </ol>
-      <MealDialog target={target} onClose={() => setTarget(null)} />
+      <MealDialog base={base} target={target} onClose={() => setTarget(null)} />
     </>
   );
 }
 
-export function ShoppingSuggestions({ weekStart }: { weekStart: string }) {
+export function ShoppingSuggestions({ base, weekStart }: { base: string; weekStart: string }) {
   const qc = useQueryClient();
   const weekEnd = addDaysIso(weekStart, 6);
   const q = useQuery({
-    queryKey: ["meal-suggestions", weekStart],
-    queryFn: () => apiGet<ShoppingSuggestion[]>(`/meals/suggestions?from=${weekStart}&to=${weekEnd}`),
+    queryKey: ["meal-suggestions", base, weekStart],
+    queryFn: () => apiGet<ShoppingSuggestion[]>(`${base}/suggestions?from=${weekStart}&to=${weekEnd}`),
   });
   const add = useMutation({
     mutationFn: async (names: string[]) => { for (const name of names) await apiPost("/shopping", { name }); return names.length; },
@@ -223,5 +248,41 @@ export function ShoppingSuggestions({ weekStart }: { weekStart: string }) {
         ))}
       </ul>
     </div>
+  );
+}
+
+/** Settings: which meal plan Today, the overview and the bedtime read-out use. */
+export function MealPlanSourceCard() {
+  const qc = useQueryClient();
+  const plans = useQuery({ queryKey: ["meal-plans"], queryFn: () => apiGet<Person[]>("/sharing/meal-plans") });
+  const settings = useQuery({ queryKey: ["settings"], queryFn: () => apiGet<AppSettings>("/settings") });
+  const save = useMutation({
+    mutationFn: (src: string | null) => apiPut<AppSettings>("/settings", { mealPlanSource: src }),
+    onSuccess: (s) => {
+      qc.setQueryData(["settings"], s);
+      for (const k of ["overview", "range"]) qc.invalidateQueries({ queryKey: [k] });
+      toast.success("Your briefing will use that meal plan");
+    },
+    onError: () => toast.error("Couldn't change the meal plan"),
+  });
+  if (!plans.data?.length) return null;
+  const current = settings.data?.mealPlanSource ?? "mine";
+  return (
+    <Card data-testid="meal-plan-source-card">
+      <CardHeader>
+        <CardTitle className="font-heading">Meals in your briefing 🍽️</CardTitle>
+        <CardDescription>Pick the plan that Today, the morning overview and the bedtime read-out show.</CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-wrap gap-2">
+        {[{ id: "mine", label: "My own plan" }, ...plans.data.map((p) => ({ id: p.user_id, label: `${p.name.split(" ")[0]}'s bouquet plan` }))].map((o) => (
+          <button key={o.id} type="button" onClick={() => save.mutate(o.id === "mine" ? null : o.id)} disabled={save.isPending}
+            className={cn("rounded-full px-3 py-1.5 text-sm ring-1 ring-border transition-[background-color,color] duration-150",
+              current === o.id ? "bg-primary text-primary-foreground ring-primary" : "hover:bg-accent")}
+            aria-pressed={current === o.id} data-testid={`meal-plan-source-${o.id}`}>
+            {o.label}
+          </button>
+        ))}
+      </CardContent>
+    </Card>
   );
 }

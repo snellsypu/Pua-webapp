@@ -5,7 +5,7 @@ import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { motion } from "motion/react";
 import { toast } from "sonner";
-import { CalendarHeart, Gift, Pencil, Plus, Settings2, Trash2, X } from "lucide-react";
+import { CalendarHeart, Gift, Pencil, Plus, Settings2, ShoppingCart, Trash2, X } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { apiDelete, apiGet, apiPost, apiPut } from "@/lib/api";
 import type { Anniversary, AnniversaryIn, AnniversaryKind, UpcomingEvent } from "@/lib/types";
@@ -50,6 +50,11 @@ function EventDialog({ open, onOpenChange, initial }: { open: boolean; onOpenCha
   const [f, setF] = useState<AnniversaryIn>(() => initial ?? { title: "", kind: "birthday", date: "01-01", year: null, emoji: "", gifts: [] });
   const [gift, setGift] = useState("");
   const [yearText, setYearText] = useState(() => (initial?.year ? String(initial.year) : ""));
+  const toShopping = useMutation({
+    mutationFn: (name: string) => apiPost("/shopping", { name }),
+    onSuccess: (_, name) => { qc.invalidateQueries({ queryKey: ["shopping"] }); toast.success(`"${name}" added to the shopping list`); },
+    onError: () => toast.error("Could not add to the shopping list"),
+  });
   const addGift = () => { if (gift.trim()) { setF({ ...f, gifts: [...f.gifts, { text: gift.trim(), bought: false }] }); setGift(""); } };
   const [month, day] = f.date.split("-").map(Number);
   const save = useMutation({
@@ -113,6 +118,13 @@ function EventDialog({ open, onOpenChange, initial }: { open: boolean; onOpenCha
                       <Checkbox checked={g.bought} aria-label={`Bought ${g.text}`} data-testid={`anniversary-gift-bought-${i}`}
                         onCheckedChange={(v) => setF({ ...f, gifts: f.gifts.map((x, j) => (j === i ? { ...x, bought: v === true } : x)) })} />
                       <span className={cn("flex-1", g.bought && "text-muted-foreground line-through")}>{g.text}</span>
+                      {!g.bought && (
+                        <button type="button" aria-label={`Add ${g.text} to shopping list`} title="Add to shopping list" onClick={() => toShopping.mutate(g.text)}
+                          disabled={toShopping.isPending}
+                          className="rounded p-0.5 text-muted-foreground transition-[color,transform] duration-150 hover:text-primary active:scale-90" data-testid={`anniversary-gift-to-shopping-${i}`}>
+                          <ShoppingCart className="size-3.5" />
+                        </button>
+                      )}
                       <button type="button" aria-label="Remove" onClick={() => setF({ ...f, gifts: f.gifts.filter((_, j) => j !== i) })}
                         className="rounded p-0.5 text-muted-foreground hover:text-foreground" data-testid={`anniversary-gift-remove-${i}`}><X className="size-3.5" /></button>
                     </li>

@@ -44,6 +44,7 @@ def _out(doc: dict) -> AppSettings:
         leaveAlerts=bool(doc.get("leaveAlerts", False)),
         transitAvailable=bool(os.environ.get("GOOGLE_MAPS_API_KEY")),
         runReminders=bool(doc.get("runReminders", False)),
+        mealPlanSource=doc.get("mealPlanSource"),
     )
 
 
@@ -64,7 +65,11 @@ async def update_settings(input: SettingsUpdate):
     for k in ("home", "homeAddress"):
         if updates.get(k) is not None:
             updates[k] = getattr(input, k).model_dump()
-    nullable = ("home", "homeAddress", "weekendWakeTime")
+    if updates.get("mealPlanSource"):
+        from lib.mealplan import can_use_meals
+        if not await can_use_meals(updates["mealPlanSource"]):
+            raise HTTPException(status_code=403, detail="That bouquet doesn't share its meal plan with you")
+    nullable = ("home", "homeAddress", "weekendWakeTime", "mealPlanSource")
     updates = {k: v for k, v in updates.items() if v is not None or k in nullable}
     updates["updatedAt"] = datetime.now(timezone.utc)
     await db.settings.update_one({"id": "app"}, {"$set": updates})

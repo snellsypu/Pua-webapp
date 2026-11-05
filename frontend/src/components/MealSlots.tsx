@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Plus, ShoppingCart, Trash2 } from "lucide-react";
-import { apiDelete, apiPost } from "@/lib/api";
-import type { Meal, MealSlot } from "@/lib/types";
+import { apiDelete, apiGet, apiPost } from "@/lib/api";
+import type { AppSettings, Meal, MealSlot } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -13,6 +13,13 @@ const SLOTS: { slot: MealSlot; label: string; emoji: string }[] = [
   { slot: "dinner", label: "Dinner", emoji: "🍲" },
   { slot: "snack", label: "Snack", emoji: "🍎" },
 ];
+
+/** Today / overview / calendar show the plan chosen in Settings, so edits go to that plan too. */
+function useMealBase() {
+  const settings = useQuery({ queryKey: ["settings"], queryFn: () => apiGet<AppSettings>("/settings") });
+  const src = settings.data?.mealPlanSource;
+  return src ? `/sharing/planner/${src}/meals` : "/meals";
+}
 
 function SlotRow({
   date,
@@ -28,6 +35,7 @@ function SlotRow({
   meal?: Meal;
 }) {
   const qc = useQueryClient();
+  const base = useMealBase();
   const [value, setValue] = useState(meal?.title ?? "");
   useEffect(() => setValue(meal?.title ?? ""), [meal?.title]);
   const invalidate = () => {
@@ -38,7 +46,7 @@ function SlotRow({
   };
   const upsert = useMutation({
     mutationFn: () =>
-      apiPost<Meal>("/meals", { date, slot, title: value.trim(), notes: meal?.notes ?? "" }),
+      apiPost<Meal>(base, { date, slot, title: value.trim(), notes: meal?.notes ?? "" }),
     onSuccess: () => {
       invalidate();
       toast.success(`${label} planned`);
@@ -46,7 +54,7 @@ function SlotRow({
     onError: () => toast.error("Could not save the meal"),
   });
   const remove = useMutation({
-    mutationFn: () => apiDelete(`/meals/${meal!.id}`),
+    mutationFn: () => apiDelete(`${base}/${meal!.id}`),
     onSuccess: () => {
       invalidate();
       setValue("");

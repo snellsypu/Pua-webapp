@@ -52,6 +52,14 @@ tomorrow's preview). Public URL: https://daily-loop-8--68ipsq2d.preview.emergent
   Premium). GET /api/meals/recipe?title=, GET /api/meals/suggestions?from&to → week's ingredients
   not already on the shopping list (shown above the list with + per item and "Add all").
   Day-level MealSlots remain on Today / overview / calendar (briefing still shows the day's meals).
+  Favourites: GET /api/meals/favourites?slot= (most-planned titles, that slot first, with recipes) →
+  ⭐ one-tap chips in the meal dialog.
+  SHARED MEAL PLAN: a bouquet sharing "meals" = ONE plan (the owner's) that every member can edit.
+  GET /api/sharing/meal-plans (owners sharing meals with me); /api/sharing/planner/{owner}/meals
+  GET/POST/DELETE {id} + /recipe, /favourites, /suggestions (vs MY shopping list) run under the
+  owner's scope (403 if meals not shared). Planner shows "My plan / X's bouquet plan" switch.
+  Settings "Meals in your briefing" → settings.mealPlanSource (owner id | null; 403 if no access);
+  lib/mealplan.plan_meals feeds overview/range/bedtime meals, and MealSlots writes to that plan.
 - `/overview` (pages/Overview.tsx) — ONE overview that follows the clock: `GET /api/daypart`
   → {part morning|evening, localTime, date, reviewTime} in settings.timezone; part = evening
   once localTime ≥ `settings.reviewTime` (default 18:00, editable in Settings → Overview &
@@ -381,6 +389,10 @@ anniversaries every decade plus traditional names (1 Paper, 5 Wood, 10 Tin, 20 C
 30 Pearl, 40 Ruby, 50 Golden, 60 Diamond, 65 Sapphire, 70 Platinum, 80 Oak) → gold badge on
 Anniversaries + heads-up card. Briefing/push wording via spoken_name(): "Mum turns 60 — a
 milestone birthday", "Wedding — 25 years, the Silver anniversary".
+Milestones also get a heads-up 30 days ahead (heads-up card "In a month — time to plan", briefing
+"In a month: … — time to start planning.", morning push "In a month ✨"). Your birthday
+(users.birthday {date, year?, share}) — the year lets bouquet friends see your age + milestones.
+Gift ideas have a 🛒 button in the event dialog → POST /api/shopping.
 
 ## Jungle extras
 - Birdsong (lib/birdsong.ts, Web Audio synth): plays when a routine is newly finished or a

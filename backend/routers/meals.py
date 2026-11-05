@@ -13,7 +13,7 @@ from fastapi import APIRouter, HTTPException, Query
 from pymongo import ASCENDING, ReturnDocument
 
 from lib.db import current_owner, db
-from models.planner import (MEAL_SLOTS, Meal, MealUpsert, Recipe, RecipeGuessIn, ShoppingSuggestion,
+from models.planner import (MEAL_SLOTS, FavouriteMeal, Meal, MealUpsert, Recipe, RecipeGuessIn, ShoppingSuggestion,
                             clean_ingredients)
 from routers.premium import is_premium
 
@@ -77,12 +77,24 @@ async def guess_recipe(input: RecipeGuessIn):
     return Recipe(title=input.title, ingredients=clean_ingredients([str(i) for i in items if isinstance(i, str)]))
 
 
-@router.get("/suggestions", response_model=list[ShoppingSuggestion])
-async def shopping_suggestions(from_: str = Query(alias="from"), to: str = Query()):
-    """Ingredients of the meals planned in [from, to] that aren't already on the shopping list."""
-    on_list = {_key(i["name"]) async for i in db.shopping_items.find({}, {"name": 1})}
+@router.get("/favourites", response_model=list[FavouriteMeal])
+async def favourites(slot: str | None = None, limit: int = Query(default=8, ge=1, le=20)):
+    """Most-planned meals with their remembered ingredients — the given slot's favourites first."""
+    counts: dict[str, list] = {}  # key → [title, total, in this slot]
+    async for m in db.meals.find({}, {"title": 1, "slot": 1}):
+        k = _key(m.get("title", ""))
+        if k:
+            c = counts.setdefault(k, [m["title"], 0, 0])
+            c[1] += 1
+            c[2] += m.get("slot") == slot
+    top = sorted(counts.items(), key=lambda kv: (-kv[1][2], -kv[1][1], kv[0]))[:limit]
+    return [FavouriteMeal(title=t, count=n, ingredients=await _recipe(t)) for _, (t, n, _s) in top]
+
+
+def suggestions_for(meals: list[Meal], on_list_names: list[str]) -> list[ShoppingSuggestion]:
+    on_list = {_key(n) for n in on_list_names}
     out: dict[str, ShoppingSuggestion] = {}
-    for m in await list_meals(from_, to):
+    for m in meals:
         for ing in m.ingredients:
             k = _key(ing)
             if k in on_list:
@@ -91,6 +103,16 @@ async def shopping_suggestions(from_: str = Query(alias="from"), to: str = Query
             if m.title not in s.meals:
                 s.meals.append(m.title)
     return sorted(out.values(), key=lambda s: (-len(s.meals), s.name.lower()))
+
+
+async def my_list_names() -> list[str]:
+    return [i["name"] async for i in db.shopping_items.find({}, {"name": 1})]
+
+
+@router.get("/suggestions", response_model=list[ShoppingSuggestion])
+async def shopping_suggestions(from_: str = Query(alias="from"), to: str = Query()):
+    """Ingredients of the meals planned in [from, to] that aren't already on the shopping list."""
+    return suggestions_for(await list_meals(from_, to), await my_list_names())
 
 
 @router.post("", response_model=Meal)

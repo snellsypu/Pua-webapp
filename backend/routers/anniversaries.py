@@ -17,6 +17,7 @@ router = APIRouter(prefix="/anniversaries", tags=["anniversaries"])
 
 Kind = Literal["birthday", "anniversary", "event"]
 HEADS_UP = (7, 1, 0)
+MILESTONE_LEAD = 30  # milestone birthdays/anniversaries get an extra heads-up a month ahead
 
 
 class GiftIdea(BaseModel):
@@ -70,6 +71,7 @@ class HolidaySetState(BaseModel):
 
 class MyBirthday(BaseModel):
     date: str | None = None  # MM-DD; null = not set
+    year: int | None = Field(default=None, ge=1900, le=2100)  # birth year → bouquet sees your age
     share: bool = False  # bouquet friends see it in their Anniversaries
 
     @field_validator("date")
@@ -149,9 +151,12 @@ async def upcoming(days: int = 366) -> list[UpcomingEvent]:
     out: list[UpcomingEvent] = []
     for u in await _friend_birthdays(current_owner.get()):
         nxt = _next(u["birthday"]["date"], today)
+        by = u["birthday"].get("year")
+        yrs = nxt.year - by if by else None
         out.append(UpcomingEvent(
             id=f"friend:{u['user_id']}", title=u.get("name", "Friend").split(" ")[0], emoji="🎈", kind="birthday",
-            next=nxt.isoformat(), daysUntil=(nxt - today).days, friend=u["user_id"]))
+            next=nxt.isoformat(), daysUntil=(nxt - today).days, years=yrs, milestone=milestone("birthday", yrs),
+            friend=u["user_id"]))
     async for a in db.anniversaries.find({}, {"_id": 0}):
         ann = Anniversary(**a)
         nxt = _next(ann.date, today)
@@ -174,6 +179,7 @@ def heads_up_line(events: list[UpcomingEvent]) -> str:
         todo = [g.text for g in (e.custom.gifts if e.custom else []) if not g.bought]
         return f" — gift ideas: {', '.join(todo[:4])}" if todo else ""
     groups = {d: [name(e) + (gifts(e) if d in (7, 1) else "") for e in events if e.daysUntil == d] for d in HEADS_UP}
+    month = [name(e) for e in events if is_heads_up(e) and e.daysUntil == MILESTONE_LEAD]
     bits = []
     if groups[0]:
         bits.append(f"Today is {' and '.join(groups[0])}.")
@@ -181,7 +187,13 @@ def heads_up_line(events: list[UpcomingEvent]) -> str:
         bits.append(f"Tomorrow: {' and '.join(groups[1])}.")
     if groups[7]:
         bits.append(f"In one week: {' and '.join(groups[7])}.")
+    if month:
+        bits.append(f"In a month: {' and '.join(month)} — time to start planning.")
     return " ".join(bits)
+
+
+def is_heads_up(e: UpcomingEvent) -> bool:
+    return e.daysUntil in HEADS_UP or (e.daysUntil == MILESTONE_LEAD and bool(e.milestone))
 
 
 @router.get("", response_model=list[UpcomingEvent])
@@ -192,7 +204,7 @@ async def list_upcoming():
 @router.get("/heads-up", response_model=list[UpcomingEvent])
 async def heads_up():
     """Events today, tomorrow and in exactly one week (for the morning briefing card)."""
-    return [e for e in await upcoming(8) if e.daysUntil in HEADS_UP]
+    return [e for e in await upcoming(MILESTONE_LEAD + 1) if is_heads_up(e)]
 
 
 @router.get("/my-birthday", response_model=MyBirthday)

@@ -192,7 +192,7 @@ async def _anniversary_line() -> str:
     from routers.anniversaries import heads_up_line, upcoming
 
     try:
-        return heads_up_line(await upcoming(8))
+        return heads_up_line(await upcoming(31))
     except Exception:
         return ""
 
@@ -230,7 +230,8 @@ async def build_bedtime() -> str:
     else:
         out.append("No appointments tomorrow.")
     order = {"breakfast": 0, "lunch": 1, "dinner": 2, "snack": 3}
-    meals = sorted(await db.meals.find({"date": tomorrow}).to_list(20), key=lambda m: order.get(m.get("slot"), 9))
+    from lib.mealplan import plan_meals
+    meals = sorted(await plan_meals({"date": tomorrow}), key=lambda m: order.get(m.get("slot"), 9))
     if meals:
         out.append("Meals: " + _join([f"{m['slot']} is {m['title']}" for m in meals]) + ".")
     else:

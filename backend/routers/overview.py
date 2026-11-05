@@ -42,7 +42,8 @@ async def _appointments(date_from: str, date_to: str) -> list[Appointment]:
 
 
 async def _meals(date_from: str, date_to: str) -> list[Meal]:
-    docs = await db.meals.find({"date": {"$gte": date_from, "$lte": date_to}}).to_list(1000)
+    from lib.mealplan import plan_meals
+    docs = await plan_meals({"date": {"$gte": date_from, "$lte": date_to}})
     docs.sort(key=lambda d: (d["date"], _SLOT_ORDER.get(d.get("slot", "snack"), 9)))
     return [Meal(**d) for d in docs]
 

@@ -76,6 +76,7 @@ class AppSettings(BaseModel):
     leaveAlerts: bool = False  # push "time to leave" before appointments (needs homeAddress)
     transitAvailable: bool = False  # read-only: a Google Maps key is configured
     runReminders: bool = False  # push 15 min before the planned best run time
+    mealPlanSource: str | None = None  # user_id of a bouquet's shared meal plan for Today/briefing; None = mine
 
 
 class RunPlan(BaseModel):
@@ -148,6 +149,7 @@ class SettingsUpdate(BaseModel):
     liveLocation: bool | None = None
     leaveAlerts: bool | None = None
     runReminders: bool | None = None
+    mealPlanSource: str | None = None  # explicit null = my own plan
 
     @field_validator("reviewTime", "wakeTime", "weekendWakeTime")
     @classmethod
@@ -434,6 +436,12 @@ class Recipe(BaseModel):
 
 class RecipeGuessIn(BaseModel):
     title: str = Field(min_length=1, max_length=80)
+
+
+class FavouriteMeal(BaseModel):
+    title: str
+    count: int  # times planned
+    ingredients: list[str] = Field(default_factory=list)
 
 
 class ShoppingSuggestion(BaseModel):

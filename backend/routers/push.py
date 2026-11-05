@@ -169,7 +169,7 @@ async def _anniversary_alert(now_local: datetime, local_date: str) -> None:
     prefs = await db.anniversary_prefs.find_one({"id": "prefs"}) or {}
     if prefs.get("lastAlertDate") == local_date:
         return
-    events = [e for e in await upcoming(8) if e.daysUntil in (7, 1)]
+    events = [e for e in await upcoming(31) if e.daysUntil in (7, 1) or (e.daysUntil == 30 and e.milestone)]
     claimed = await db.anniversary_prefs.update_one(
         {"id": "prefs", "lastAlertDate": {"$ne": local_date}}, {"$set": {"lastAlertDate": local_date}}, upsert=True)
     if not (claimed.modified_count or claimed.upserted_id) or not events:
@@ -177,7 +177,7 @@ async def _anniversary_alert(now_local: datetime, local_date: str) -> None:
     def line(e) -> str:
         n = spoken_name(e)
         todo = [g.text for g in (e.custom.gifts if e.custom else []) if not g.bought]
-        return f"{'Tomorrow' if e.daysUntil == 1 else 'In 1 week'}: {n}" + (f" (gifts: {', '.join(todo[:3])})" if todo else "")
+        return f"{'Tomorrow' if e.daysUntil == 1 else 'In 1 week' if e.daysUntil == 7 else 'In a month ✨'}: {n}" + (f" (gifts: {', '.join(todo[:3])})" if todo else "")
     result = await push_lib.send_to_all("Coming up 🎂", " · ".join(line(e) for e in events[:4]), url="/anniversaries", tag="anniversaries")
     logger.info("anniversary push: %s", result.model_dump())
 

@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { format, parseISO, startOfWeek } from "date-fns";
 import { CalendarDays, ChevronLeft, ChevronRight, ShoppingCart, Trash2 } from "lucide-react";
 import { apiDelete, apiGet, apiPatch, apiPost } from "@/lib/api";
-import type { DayContext, ShoppingItem } from "@/lib/types";
+import type { DayContext, Person, ShoppingItem } from "@/lib/types";
 import { addDaysIso } from "@/lib/dates";
 import { MealWeek, ShoppingSuggestions } from "@/components/MealWeek";
 import { Button } from "@/components/ui/button";
@@ -26,6 +26,10 @@ export default function Planner() {
   const [pickerMonth, setPickerMonth] = useState<Date>(new Date());
   const monday = (iso: string) => format(startOfWeek(parseISO(`${iso}T12:00:00`), { weekStartsOn: 1 }), "yyyy-MM-dd");
   const week = weekStart ?? (today ? monday(today) : null);
+  const plans = useQuery({ queryKey: ["meal-plans"], queryFn: () => apiGet<Person[]>("/sharing/meal-plans") });
+  const [plan, setPlan] = useState<string>("mine");
+  const planOwner = plans.data?.find((p) => p.user_id === plan);
+  const base = planOwner ? `/sharing/planner/${planOwner.user_id}/meals` : "/meals";
 
   const shopping = useQuery({
     queryKey: ["shopping"],
@@ -122,10 +126,24 @@ export default function Planner() {
                 </Button>
               </div>
             </div>
-            <CardDescription>Tap any slot to plan it and list its ingredients — they&apos;re remembered for next time.</CardDescription>
+            {!!plans.data?.length && (
+              <div className="flex flex-wrap gap-1.5" role="tablist" aria-label="Which meal plan" data-testid="meal-plan-switch">
+                {[{ id: "mine", label: "My plan" }, ...plans.data.map((p) => ({ id: p.user_id, label: `${p.name.split(" ")[0]}'s bouquet plan` }))].map((o) => (
+                  <button key={o.id} type="button" role="tab" aria-selected={(planOwner?.user_id ?? "mine") === o.id} onClick={() => setPlan(o.id)}
+                    className={cn("rounded-full px-3 py-1 text-xs font-medium ring-1 ring-border transition-[background-color,color] duration-150",
+                      (planOwner?.user_id ?? "mine") === o.id ? "bg-primary text-primary-foreground ring-primary" : "hover:bg-accent")}
+                    data-testid={`meal-plan-option-${o.id}`}>
+                    {o.id === "mine" ? "🍽️" : "💐"} {o.label}
+                  </button>
+                ))}
+              </div>
+            )}
+            <CardDescription>
+              {planOwner ? `One plan for the whole bouquet — anything you change, everyone sees.` : "Tap any slot to plan it and list its ingredients — they're remembered for next time."}
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            {week && today ? <MealWeek weekStart={week} today={today} /> : <div className="h-64 animate-pulse rounded-xl bg-muted" />}
+            {week && today ? <MealWeek base={base} weekStart={week} today={today} /> : <div className="h-64 animate-pulse rounded-xl bg-muted" />}
           </CardContent>
         </Card>
 
@@ -150,7 +168,7 @@ export default function Planner() {
             )}
           </CardHeader>
           <CardContent className="space-y-3">
-            {week && <ShoppingSuggestions weekStart={week} />}
+            {week && <ShoppingSuggestions base={base} weekStart={week} />}
             <div className="flex gap-2">
               <Input
                 value={itemName}

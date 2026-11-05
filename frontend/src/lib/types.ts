@@ -29,6 +29,7 @@ export interface AppSettings {
   leaveAlerts: boolean; // "time to leave" pushes before appointments
   transitAvailable: boolean; // read-only: Google Maps key configured
   runReminders: boolean; // push 15 min before the planned run time
+  mealPlanSource: string | null; // user_id of a bouquet's shared meal plan for Today/briefing; null = mine
 }
 
 // Mirrors RunPlan in backend/models/planner.py
@@ -190,6 +191,11 @@ export interface MealUpsert {
 }
 export interface Recipe {
   title: string;
+  ingredients: string[];
+}
+export interface FavouriteMeal {
+  title: string;
+  count: number;
   ingredients: string[];
 }
 export interface ShoppingSuggestion {
@@ -600,6 +606,7 @@ export interface GiftIdea {
 }
 export interface MyBirthday {
   date: string | null; // MM-DD
+  year: number | null; // birth year → bouquet sees your age
   share: boolean; // bouquet friends see it
 }
 export interface Anniversary extends AnniversaryIn {

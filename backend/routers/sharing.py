@@ -20,7 +20,8 @@ from models.auth import (
     Leaderboard, LeaderboardEntry,
     Bouquet, BouquetCreate, BouquetUpdate, FriendColorIn, JoinedPlanner, JoinIn, Person, SharingState,
 )
-from models.planner import Appointment, ShoppingCreate, ShoppingItem, ShoppingUpdate
+from models.planner import (Appointment, FavouriteMeal, Meal, MealUpsert, Recipe, ShoppingCreate, ShoppingItem,
+                            ShoppingSuggestion, ShoppingUpdate)
 from models.sharing import FriendCalendar, SharedPlanner
 
 router = APIRouter(prefix="/sharing", tags=["sharing"])
@@ -345,3 +346,97 @@ async def friend_tick_item(owner_id: str, item_id: str, input: ShoppingUpdate, r
         return await shopping.update_item(item_id, ShoppingUpdate(checked=input.checked))
     finally:
         current_owner.reset(token)
+
+
+# ---------------------------------------------------------------- shared meal plan
+# A bouquet that shares "meals" gives every member ONE plan — the owner's — which anyone in
+# it can edit. Calls run under the owner's scope, so recipes are remembered on that plan.
+
+
+async def _meals_owner(owner_id: str, request: Request) -> str:
+    _, cats, _ = await _owner_for(owner_id, _uid(request))
+    if "meals" not in cats:
+        raise HTTPException(status_code=403, detail="This bouquet doesn't share its meal plan")
+    return owner_id
+
+
+@router.get("/meal-plans", response_model=list[Person])
+async def shared_meal_plans(request: Request):
+    """Owners whose bouquets share a meal plan with you."""
+    uid = _uid(request)
+    owner_ids = list(dict.fromkeys([m["ownerId"] async for m in raw_db.bouquet_members.find({"viewerId": uid})]))
+    out = []
+    async for u in raw_db.users.find({"user_id": {"$in": owner_ids}}, {"_id": 0}).sort("name", 1):
+        cats, _, _ = await _access(u["user_id"], uid)
+        if "meals" in cats:
+            out.append(_person(u))
+    return out
+
+
+@router.get("/planner/{owner_id}/meals", response_model=list[Meal])
+async def friend_meals(owner_id: str, request: Request, from_: str | None = Query(default=None, alias="from"),
+                       to: str | None = Query(default=None)):
+    from routers import meals
+
+    token = current_owner.set(await _meals_owner(owner_id, request))
+    try:
+        return await meals.list_meals(from_, to)
+    finally:
+        current_owner.reset(token)
+
+
+@router.post("/planner/{owner_id}/meals", response_model=Meal)
+async def friend_upsert_meal(owner_id: str, input: MealUpsert, request: Request):
+    from routers import meals
+
+    token = current_owner.set(await _meals_owner(owner_id, request))
+    try:
+        return await meals.upsert_meal(input)
+    finally:
+        current_owner.reset(token)
+
+
+@router.delete("/planner/{owner_id}/meals/{meal_id}")
+async def friend_delete_meal(owner_id: str, meal_id: str, request: Request):
+    from routers import meals
+
+    token = current_owner.set(await _meals_owner(owner_id, request))
+    try:
+        return await meals.delete_meal(meal_id)
+    finally:
+        current_owner.reset(token)
+
+
+@router.get("/planner/{owner_id}/meals/recipe", response_model=Recipe)
+async def friend_recipe(owner_id: str, request: Request, title: str = Query(min_length=1)):
+    from routers import meals
+
+    token = current_owner.set(await _meals_owner(owner_id, request))
+    try:
+        return await meals.get_recipe(title)
+    finally:
+        current_owner.reset(token)
+
+
+@router.get("/planner/{owner_id}/meals/favourites", response_model=list[FavouriteMeal])
+async def friend_favourites(owner_id: str, request: Request, slot: str | None = None):
+    from routers import meals
+
+    token = current_owner.set(await _meals_owner(owner_id, request))
+    try:
+        return await meals.favourites(slot, 8)
+    finally:
+        current_owner.reset(token)
+
+
+@router.get("/planner/{owner_id}/meals/suggestions", response_model=list[ShoppingSuggestion])
+async def friend_suggestions(owner_id: str, request: Request, from_: str = Query(alias="from"), to: str = Query()):
+    """The shared plan's ingredients that aren't on YOUR shopping list yet."""
+    from routers import meals
+
+    token = current_owner.set(await _meals_owner(owner_id, request))
+    try:
+        planned = await meals.list_meals(from_, to)
+    finally:
+        current_owner.reset(token)
+    return meals.suggestions_for(planned, await meals.my_list_names())
