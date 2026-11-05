@@ -157,6 +157,31 @@ async def run_routine_notifications() -> None:
             current_owner.reset(token)
 
 
+async def _anniversary_alert(now_local: datetime, local_date: str) -> None:
+    """Once a day at the morning routine time: push events 1 week and 1 day away (+ gift ideas)."""
+    from routers.anniversaries import upcoming
+
+    routine = await db.routines.find_one({"kind": "morning"}) or {}
+    hh, mm = (int(p) for p in (routine.get("time") or "07:00").split(":"))
+    scheduled = now_local.replace(hour=hh, minute=mm, second=0, microsecond=0)
+    if now_local < scheduled or now_local.hour >= 21:
+        return
+    prefs = await db.anniversary_prefs.find_one({"id": "prefs"}) or {}
+    if prefs.get("lastAlertDate") == local_date:
+        return
+    events = [e for e in await upcoming(8) if e.daysUntil in (7, 1)]
+    claimed = await db.anniversary_prefs.update_one(
+        {"id": "prefs", "lastAlertDate": {"$ne": local_date}}, {"$set": {"lastAlertDate": local_date}}, upsert=True)
+    if not (claimed.modified_count or claimed.upserted_id) or not events:
+        return
+    def line(e) -> str:
+        n = f"{e.title}'s birthday" if e.kind == "birthday" else e.title
+        todo = [g.text for g in (e.custom.gifts if e.custom else []) if not g.bought]
+        return f"{'Tomorrow' if e.daysUntil == 1 else 'In 1 week'}: {n}" + (f" (gifts: {', '.join(todo[:3])})" if todo else "")
+    result = await push_lib.send_to_all("Coming up 🎂", " · ".join(line(e) for e in events[:4]), url="/anniversaries", tag="anniversaries")
+    logger.info("anniversary push: %s", result.model_dump())
+
+
 async def _run_for_owner() -> None:
     settings = await db.settings.find_one({"id": "app"}) or {}
     try:
@@ -174,6 +199,10 @@ async def _run_for_owner() -> None:
         await _run_reminder(settings, now_local)
     except Exception:
         logger.exception("run reminder failed")
+    try:
+        await _anniversary_alert(now_local, local_date)
+    except Exception:
+        logger.exception("anniversary alert failed")
     try:
         from lib.duolingo import sync_duolingo
 

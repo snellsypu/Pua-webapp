@@ -6,11 +6,11 @@ import uuid
 from datetime import date, datetime, timedelta, timezone
 from typing import Literal
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field, field_validator
 
 from lib.dates import today_iso
-from lib.db import db
+from lib.db import db, raw_db
 from lib.holidays import DEFAULT_SETS, HOLIDAY_SETS, holidays_between
 
 router = APIRouter(prefix="/anniversaries", tags=["anniversaries"])
@@ -19,12 +19,19 @@ Kind = Literal["birthday", "anniversary", "event"]
 HEADS_UP = (7, 1, 0)
 
 
+class GiftIdea(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    text: str = Field(min_length=1, max_length=80)
+    bought: bool = False
+
+
 class AnniversaryIn(BaseModel):
     title: str = Field(min_length=1, max_length=80)
     kind: Kind = "birthday"
     date: str  # MM-DD (repeats yearly)
     year: int | None = Field(default=None, ge=1900, le=2100)  # birth / wedding year → "turns 30"
     emoji: str = Field(default="", max_length=8)
+    gifts: list[GiftIdea] = Field(default_factory=list, max_length=20)  # gift ideas (birthdays)
 
     @field_validator("date")
     @classmethod
@@ -50,6 +57,7 @@ class UpcomingEvent(BaseModel):
     daysUntil: int
     years: int | None = None  # "turns N" / "N years" on the next occurrence
     custom: Anniversary | None = None  # editable fields (custom events only)
+    friend: str | None = None  # user_id when it's a bouquet friend's shared birthday
 
 
 class HolidaySetState(BaseModel):
@@ -57,6 +65,18 @@ class HolidaySetState(BaseModel):
     label: str
     group: str
     enabled: bool
+
+
+class MyBirthday(BaseModel):
+    date: str | None = None  # MM-DD; null = not set
+    share: bool = False  # bouquet friends see it in their Anniversaries
+
+    @field_validator("date")
+    @classmethod
+    def _md(cls, v: str | None) -> str | None:
+        if v:
+            date.fromisoformat(f"2024-{v}")
+        return v or None
 
 
 class HolidaySetsIn(BaseModel):
@@ -79,12 +99,31 @@ def _next(md: str, today: date) -> date:
 
 async def _sets() -> list[str]:
     doc = await db.anniversary_prefs.find_one({"id": "prefs"})
-    return doc["sets"] if doc else DEFAULT_SETS
+    return doc.get("sets", DEFAULT_SETS) if doc else DEFAULT_SETS
+
+
+async def _friend_birthdays(uid: str) -> list[dict]:
+    """Shared birthdays of everyone you share a bouquet with (either direction)."""
+    mine = [b["id"] async for b in raw_db.bouquets.find({"ownerId": uid}, {"id": 1})]
+    ids = {m["viewerId"] async for m in raw_db.bouquet_members.find({"bouquetId": {"$in": mine}})}
+    joined = [m async for m in raw_db.bouquet_members.find({"viewerId": uid})]
+    ids |= {m["ownerId"] for m in joined}
+    ids |= {m["viewerId"] async for m in raw_db.bouquet_members.find({"bouquetId": {"$in": [j["bouquetId"] for j in joined]}})}
+    ids.discard(uid)
+    return [u async for u in raw_db.users.find(
+        {"user_id": {"$in": list(ids)}, "birthday.share": True, "birthday.date": {"$ne": None}}, {"_id": 0})]
 
 
 async def upcoming(days: int = 366) -> list[UpcomingEvent]:
+    from lib.db import current_owner
+
     today = date.fromisoformat(today_iso())
     out: list[UpcomingEvent] = []
+    for u in await _friend_birthdays(current_owner.get()):
+        nxt = _next(u["birthday"]["date"], today)
+        out.append(UpcomingEvent(
+            id=f"friend:{u['user_id']}", title=u.get("name", "Friend").split(" ")[0], emoji="🎈", kind="birthday",
+            next=nxt.isoformat(), daysUntil=(nxt - today).days, friend=u["user_id"]))
     async for a in db.anniversaries.find({}, {"_id": 0}):
         ann = Anniversary(**a)
         nxt = _next(ann.date, today)
@@ -107,7 +146,10 @@ def heads_up_line(events: list[UpcomingEvent]) -> str:
         if e.kind == "anniversary":
             return e.title + (f" ({e.years} years)" if e.years else "")
         return e.title
-    groups = {d: [name(e) for e in events if e.daysUntil == d] for d in HEADS_UP}
+    def gifts(e: UpcomingEvent) -> str:
+        todo = [g.text for g in (e.custom.gifts if e.custom else []) if not g.bought]
+        return f" — gift ideas: {', '.join(todo[:4])}" if todo else ""
+    groups = {d: [name(e) + (gifts(e) if d in (7, 1) else "") for e in events if e.daysUntil == d] for d in HEADS_UP}
     bits = []
     if groups[0]:
         bits.append(f"Today is {' and '.join(groups[0])}.")
@@ -127,6 +169,18 @@ async def list_upcoming():
 async def heads_up():
     """Events today, tomorrow and in exactly one week (for the morning briefing card)."""
     return [e for e in await upcoming(8) if e.daysUntil in HEADS_UP]
+
+
+@router.get("/my-birthday", response_model=MyBirthday)
+async def get_my_birthday(request: Request):
+    u = await raw_db.users.find_one({"user_id": request.state.user["user_id"]}, {"birthday": 1}) or {}
+    return MyBirthday(**(u.get("birthday") or {}))
+
+
+@router.put("/my-birthday", response_model=MyBirthday)
+async def put_my_birthday(input: MyBirthday, request: Request):
+    await raw_db.users.update_one({"user_id": request.state.user["user_id"]}, {"$set": {"birthday": input.model_dump()}})
+    return input
 
 
 @router.get("/holiday-sets", response_model=list[HolidaySetState])

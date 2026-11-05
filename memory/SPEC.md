@@ -378,3 +378,12 @@ cultural).
   with a lei > 0.
 - Every card also has a vine along its left and bottom border (`[data-slot=card]::after`,
   public/vine-edge.svg + vine-garland.svg).
+- **Gift ideas**: `Anniversary.gifts` [{id, text, bought}] (edited in the event dialog for
+  birthdays); unbought ideas are added to the 1-week/1-day heads-ups (briefing, push, Today card).
+- **Friends' birthdays**: users.birthday {date MM-DD, share}; GET/PUT /anniversaries/my-birthday
+  (Settings "Your birthday"). Shared birthdays of anyone you share a bouquet with (owner,
+  members, co-members) appear in Anniversaries as kind birthday, `friend` = user_id, id
+  "friend:<uid>", read-only.
+- **Push alerts**: push cron `_anniversary_alert` — once a day at/after the morning routine
+  time (before 21:00) sends "Coming up 🎂" for events 7 days and 1 day away (+ gifts);
+  claimed via anniversary_prefs.lastAlertDate.

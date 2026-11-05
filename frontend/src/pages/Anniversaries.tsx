@@ -5,7 +5,8 @@ import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { motion } from "motion/react";
 import { toast } from "sonner";
-import { CalendarHeart, Pencil, Plus, Settings2, Trash2 } from "lucide-react";
+import { CalendarHeart, Gift, Pencil, Plus, Settings2, Trash2, X } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { apiDelete, apiGet, apiPost, apiPut } from "@/lib/api";
 import type { Anniversary, AnniversaryIn, AnniversaryKind, UpcomingEvent } from "@/lib/types";
 import { fmtShort } from "@/lib/dates";
@@ -28,13 +29,15 @@ export function eventLabel(e: UpcomingEvent) {
   return e.title;
 }
 const subLabel = (e: UpcomingEvent) =>
-  e.kind === "birthday" && e.years ? `Turns ${e.years}` : e.kind === "anniversary" && e.years ? `${e.years} years` : e.kind === "holiday" ? "Holiday" : e.custom ? KIND_LABEL[e.custom.kind] : "";
+  e.friend ? "Bouquet friend" : e.kind === "birthday" && e.years ? `Turns ${e.years}` : e.kind === "anniversary" && e.years ? `${e.years} years` : e.kind === "holiday" ? "Holiday" : e.custom ? KIND_LABEL[e.custom.kind] : "";
 
 export const useUpcoming = () => useQuery({ queryKey: ["anniversaries"], queryFn: () => apiGet<UpcomingEvent[]>("/anniversaries") });
 
 function EventDialog({ open, onOpenChange, initial }: { open: boolean; onOpenChange: (o: boolean) => void; initial: Anniversary | null }) {
   const qc = useQueryClient();
-  const [f, setF] = useState<AnniversaryIn>(() => initial ?? { title: "", kind: "birthday", date: "01-01", year: null, emoji: "" });
+  const [f, setF] = useState<AnniversaryIn>(() => initial ?? { title: "", kind: "birthday", date: "01-01", year: null, emoji: "", gifts: [] });
+  const [gift, setGift] = useState("");
+  const addGift = () => { if (gift.trim()) { setF({ ...f, gifts: [...f.gifts, { text: gift.trim(), bought: false }] }); setGift(""); } };
   const [month, day] = f.date.split("-").map(Number);
   const save = useMutation({
     mutationFn: () => (initial ? apiPut<Anniversary>(`/anniversaries/${initial.id}`, f) : apiPost<Anniversary>("/anniversaries", f)),
@@ -87,6 +90,30 @@ function EventDialog({ open, onOpenChange, initial }: { open: boolean; onOpenCha
                 onChange={(e) => { const y = e.target.value.replace(/\D/g, ""); setF({ ...f, year: y.length === 4 ? Number(y) : null }); }} data-testid="anniversary-year-input" />
             </div>
           </div>
+          {f.kind === "birthday" && (
+            <div className="grid gap-2 rounded-xl border border-dashed p-3" data-testid="anniversary-gifts">
+              <Label className="flex items-center gap-1.5"><Gift className="size-4 text-pink-500" /> Gift ideas</Label>
+              {f.gifts.length > 0 && (
+                <ul className="space-y-1">
+                  {f.gifts.map((g, i) => (
+                    <li key={g.id ?? i} className="flex items-center gap-2 text-sm" data-testid={`anniversary-gift-${i}`}>
+                      <Checkbox checked={g.bought} aria-label={`Bought ${g.text}`} data-testid={`anniversary-gift-bought-${i}`}
+                        onCheckedChange={(v) => setF({ ...f, gifts: f.gifts.map((x, j) => (j === i ? { ...x, bought: v === true } : x)) })} />
+                      <span className={cn("flex-1", g.bought && "text-muted-foreground line-through")}>{g.text}</span>
+                      <button type="button" aria-label="Remove" onClick={() => setF({ ...f, gifts: f.gifts.filter((_, j) => j !== i) })}
+                        className="rounded p-0.5 text-muted-foreground hover:text-foreground" data-testid={`anniversary-gift-remove-${i}`}><X className="size-3.5" /></button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <div className="flex gap-1.5">
+                <Input value={gift} onChange={(e) => setGift(e.target.value)} maxLength={80} placeholder="e.g. Silk scarf" className="h-8 text-sm"
+                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addGift(); } }} data-testid="anniversary-gift-input" />
+                <Button type="button" size="sm" variant="outline" className="h-8" onClick={addGift} disabled={!gift.trim()} data-testid="anniversary-gift-add"><Plus className="size-3.5" /> Add</Button>
+              </div>
+              <p className="text-[11px] text-muted-foreground">Ideas you haven&apos;t ticked as bought are in your 1-week and 1-day reminders.</p>
+            </div>
+          )}
           <DialogFooter className="gap-2 sm:justify-between">
             {initial ? <Button type="button" variant="ghost" className="text-destructive" onClick={() => del.mutate()} data-testid="anniversary-delete"><Trash2 className="size-4" /> Delete</Button> : <span />}
             <Button type="submit" disabled={!f.title.trim() || save.isPending} data-testid="anniversary-save">Save</Button>
@@ -161,6 +188,11 @@ export default function Anniversaries() {
             <span className="min-w-0 flex-1">
               <span className="block truncate text-sm font-medium">{eventLabel(e)}</span>
               <span className="block text-xs text-muted-foreground">{fmtShort(e.next)}{subLabel(e) ? ` · ${subLabel(e)}` : ""}</span>
+              {!!e.custom?.gifts.filter((g) => !g.bought).length && (
+                <span className="mt-0.5 flex items-center gap-1 truncate text-[11px] text-pink-700 dark:text-pink-300" data-testid={`anniversary-gifts-${e.id}`}>
+                  <Gift className="size-3" /> {e.custom.gifts.filter((g) => !g.bought).map((g) => g.text).join(", ")}
+                </span>
+              )}
             </span>
             <span className={cn("shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold tabular-nums",
               e.daysUntil <= 1 ? "bg-pink-500 text-white" : e.daysUntil <= 7 ? "bg-amber-400/30 text-amber-900 dark:text-amber-200" : "bg-muted text-muted-foreground")}

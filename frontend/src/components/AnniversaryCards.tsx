@@ -5,9 +5,48 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { CalendarHeart } from "lucide-react";
 import { apiGet, apiPut } from "@/lib/api";
-import type { HolidaySetState, UpcomingEvent } from "@/lib/types";
+import type { HolidaySetState, MyBirthday, UpcomingEvent } from "@/lib/types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/** Settings: your own birthday, optionally shared with everyone in your bouquets. */
+export function MyBirthdayCard() {
+  const qc = useQueryClient();
+  const q = useQuery({ queryKey: ["my-birthday"], queryFn: () => apiGet<MyBirthday>("/anniversaries/my-birthday") });
+  const save = useMutation({
+    mutationFn: (b: MyBirthday) => apiPut<MyBirthday>("/anniversaries/my-birthday", b),
+    onSuccess: (b) => { qc.setQueryData(["my-birthday"], b); toast.success(b.share && b.date ? "Birthday saved — your bouquets will see it" : "Birthday saved"); },
+    onError: () => toast.error("Couldn't save your birthday"),
+  });
+  const b = q.data ?? { date: null, share: false };
+  const [m, d] = b.date ? b.date.split("-").map(Number) : [0, 0];
+  const setMD = (mm: number, dd: number) => save.mutate({ ...b, date: `${String(mm).padStart(2, "0")}-${String(Math.min(dd, new Date(2024, mm, 0).getDate())).padStart(2, "0")}` });
+  return (
+    <Card data-testid="my-birthday-card">
+      <CardHeader>
+        <CardTitle className="font-heading">Your birthday 🎈</CardTitle>
+        <CardDescription>Choose whether people in your bouquets see it in their Anniversaries.</CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-wrap items-center gap-3">
+        <Select value={d ? String(d) : ""} onValueChange={(v) => setMD(m || 1, Number(v))}>
+          <SelectTrigger className="w-20" data-testid="my-birthday-day" aria-label="Day"><SelectValue placeholder="Day">{d || "Day"}</SelectValue></SelectTrigger>
+          <SelectContent>{Array.from({ length: 31 }, (_, i) => <SelectItem key={i} value={String(i + 1)}>{i + 1}</SelectItem>)}</SelectContent>
+        </Select>
+        <Select value={m ? String(m) : ""} onValueChange={(v) => setMD(Number(v), d || 1)}>
+          <SelectTrigger className="w-24" data-testid="my-birthday-month" aria-label="Month"><SelectValue placeholder="Month">{m ? MONTHS[m - 1] : "Month"}</SelectValue></SelectTrigger>
+          <SelectContent>{MONTHS.map((x, i) => <SelectItem key={x} value={String(i + 1)}>{x}</SelectItem>)}</SelectContent>
+        </Select>
+        <label htmlFor="my-birthday-share" className="flex items-center gap-2.5 text-sm">
+          <Checkbox id="my-birthday-share" checked={b.share} disabled={!b.date || save.isPending} onCheckedChange={(v) => save.mutate({ ...b, share: v === true })} data-testid="my-birthday-share" />
+          Share with my bouquets
+        </label>
+      </CardContent>
+    </Card>
+  );
+}
 
 const when = (d: number) => (d === 0 ? "Today" : d === 1 ? "Tomorrow" : "In 1 week");
 
@@ -26,6 +65,11 @@ export function AnniversaryHeadsUp({ className }: { className?: string }) {
               <span>{e.emoji}</span>
               <span className="font-medium">{e.kind === "birthday" ? `${e.title}'s birthday` : e.title}</span>
               <span className="text-xs text-muted-foreground">{when(e.daysUntil)}</span>
+              {e.daysUntil > 0 && !!e.custom?.gifts.filter((g) => !g.bought).length && (
+                <span className="text-xs text-pink-700 dark:text-pink-300" data-testid={`heads-up-gifts-${e.id}`}>
+                  🎁 {e.custom.gifts.filter((g) => !g.bought).map((g) => g.text).join(", ")}
+                </span>
+              )}
             </li>
           ))}
           <li><Link to="/anniversaries" className="text-xs text-primary underline" data-testid="heads-up-all">All anniversaries</Link></li>

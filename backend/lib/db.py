@@ -137,6 +137,7 @@ INDEXES: dict[str, list[IndexModel]] = {
         IndexModel([("bouquetId", ASCENDING), ("viewerId", ASCENDING)], name="bouquet_viewer", unique=True),
         IndexModel([("viewerId", ASCENDING), ("ownerId", ASCENDING)], name="viewer_owner"),
     ],
+    "anniversary_prefs": [IndexModel([("ownerId", ASCENDING), ("id", ASCENDING)], name="owner_id", unique=True)],
     "anniversaries": [IndexModel([("ownerId", ASCENDING), ("id", ASCENDING)], name="owner_id", unique=True)],
     "strava_connections": [IndexModel([("user_id", ASCENDING)], name="user", unique=True)],
     "oauth_states": [

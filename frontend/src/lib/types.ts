@@ -575,6 +575,16 @@ export interface AnniversaryIn {
   date: string; // MM-DD, repeats yearly
   year: number | null; // birth / wedding year
   emoji: string;
+  gifts: GiftIdea[]; // gift ideas (birthdays) — unbought ones are in the 1-week heads-up
+}
+export interface GiftIdea {
+  id?: string;
+  text: string;
+  bought: boolean;
+}
+export interface MyBirthday {
+  date: string | null; // MM-DD
+  share: boolean; // bouquet friends see it
 }
 export interface Anniversary extends AnniversaryIn {
   id: string;
@@ -589,6 +599,7 @@ export interface UpcomingEvent {
   daysUntil: number;
   years: number | null;
   custom: Anniversary | null;
+  friend: string | null; // user_id when it's a bouquet friend's shared birthday
 }
 export interface HolidaySetState {
   id: string;
