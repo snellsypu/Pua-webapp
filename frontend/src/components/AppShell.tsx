@@ -14,6 +14,7 @@ import {
   Sunrise,
   Flower2,
   BarChart3,
+  CalendarHeart,
   SunMedium,
   UtensilsCrossed,
 } from "lucide-react";
@@ -37,6 +38,7 @@ const NAV = [
   { to: "/planner", label: "Planner", icon: UtensilsCrossed, testid: "nav-planner" },
   { to: "/health", label: "Health", icon: HeartPulse, testid: "nav-health" },
   { to: "/sharing", label: "Bouquets", icon: Flower2, testid: "nav-sharing" },
+  { to: "/anniversaries", label: "Anniversaries", icon: CalendarHeart, testid: "nav-anniversaries" },
   { to: "/stats", label: "Stats", icon: BarChart3, testid: "nav-stats" },
 ];
 

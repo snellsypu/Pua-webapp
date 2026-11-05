@@ -184,7 +184,17 @@ async def build_wake(live: tuple[float, float] | None = None) -> str:
         line = await commute_sentence(settings, first, live, now_hhmm)
         if line:
             out.append(line)
-    return " ".join(out)
+    out.append(await _anniversary_line())
+    return " ".join(x for x in out if x)
+
+
+async def _anniversary_line() -> str:
+    from routers.anniversaries import heads_up_line, upcoming
+
+    try:
+        return heads_up_line(await upcoming(8))
+    except Exception:
+        return ""
 
 
 async def build_bedtime() -> str:
@@ -259,6 +269,8 @@ async def build_briefing() -> str:
     if rems:
         bits = [f"{r['title']} at {spoken_time(r.get('time'))}" for r in rems[:6]]
         out.append(f"{_plural(len(rems), 'reminder').capitalize()}: {_join(bits)}.")
+    if (ann := await _anniversary_line()):
+        out.append(ann)
 
     for r in sorted(await db.routines.find().to_list(10), key=lambda x: x["kind"] != "morning"):
         steps = {s["id"] for s in r.get("steps", [])}

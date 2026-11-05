@@ -3,6 +3,7 @@
 // a view; ?wake=1 (wake-up link / notification) reads the morning out and
 // ?bedtime=1 (bedtime routine notification / first open) reads tomorrow out.
 import { useSearchParams } from "react-router-dom";
+import { AnniversaryHeadsUp } from "@/components/AnniversaryCards";
 import { MoonStar, Sunrise } from "lucide-react";
 import { useDayPart } from "@/lib/useDayPart";
 import Morning from "@/pages/Morning";
@@ -73,6 +74,7 @@ export default function Overview() {
       {wake && <WakeBanner kind="wake" onDismiss={() => setParams({}, { replace: true })} />}
       {bedtime && !wake && <WakeBanner kind="bedtime" onDismiss={() => setParams({ view: "tomorrow" }, { replace: true })} />}
 
+      {view === "today" && <AnniversaryHeadsUp className="mb-6" />}
       {view === "today" ? <Morning /> : <Evening />}
     </div>
   );

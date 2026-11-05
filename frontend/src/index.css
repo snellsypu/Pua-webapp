@@ -176,3 +176,18 @@
   opacity: 0.8;
 }
 .dark [data-slot="card"]::before { opacity: 0.35; }
+
+/* Jungle: a vine trails along the left and bottom border of every tile. */
+[data-slot="card"]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background:
+    url("/vine-edge.svg") left -2px top 10px / 14px 96px repeat-y,
+    url("/vine-garland.svg") left 18px bottom -3px / 160px 12px repeat-x;
+  opacity: 0.45;
+  pointer-events: none;
+  z-index: -1;
+}
+.dark [data-slot="card"]::after { opacity: 0.28; }

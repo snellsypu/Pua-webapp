@@ -359,3 +359,22 @@ habit)}, first sync, redirects /habits?strava=connected|denied|scope|error. GET 
 PUT /habit {habitId}, POST /sync, DELETE (deauthorize). Sync (cron ≤30 min, last 7 days):
 Run/TrailRun/VirtualRun per local day → habit_completions source "strava" (+distanceKm when
 the habit tracks distance; never overwrites manual ticks). UI: StravaCard on Habits page.
+
+## Anniversaries (/anniversaries, routers/anniversaries.py, lib/holidays.py)
+Scoped `anniversaries` {id, title, kind birthday|anniversary|event, date MM-DD (yearly), year?,
+emoji}; `anniversary_prefs` {id:"prefs", sets} (default ["uk"]). Holiday sets: uk (bank
+holidays w/ substitute days, Mother's/Father's Day, Valentine's, Halloween, Bonfire Night, NYE),
+christian (Easter-based), and table-driven islamic, jewish, hindu, sikh, buddhist, chinese
+(2026–2028). GET /anniversaries → upcoming (≤366 days) with next, daysUntil, years; GET
+/heads-up (0/1/7 days); POST/PUT/DELETE custom; GET/PUT /holiday-sets. Heads-ups are spoken in
+the wake read-out and "what's my day" briefing, and shown as a "Coming up" card on Today and
+the morning overview. Settings: "Holidays in Anniversaries" checklist (UK / by religion /
+cultural).
+
+## Jungle extras
+- Birdsong (lib/birdsong.ts, Web Audio synth): plays when a routine is newly finished or a
+  lei completes; Settings "Jungle sounds" switch + Listen (localStorage `pua:birdsong`).
+- Orchid shower (Leaderboard.tsx, portal): whenever you open a leaderboard where you're #1
+  with a lei > 0.
+- Every card also has a vine along its left and bottom border (`[data-slot=card]::after`,
+  public/vine-edge.svg + vine-garland.svg).

@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { HolidaySetsCard } from "@/components/AnniversaryCards";
+import { BirdsongCard } from "@/components/BirdsongCard";
 import { FlowerTick } from "@/components/Flower";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { motion } from "motion/react";
@@ -253,6 +255,8 @@ export default function Settings() {
       <CommuteCard />
 
       <VoiceSettingsCard />
+      <BirdsongCard />
+      <HolidaySetsCard />
 
       <NotificationsCard />
 

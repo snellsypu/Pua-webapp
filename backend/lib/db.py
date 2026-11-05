@@ -25,6 +25,7 @@ current_owner: ContextVar[str | None] = ContextVar("current_owner", default=None
 SCOPED = {
     "settings", "appointments", "habits", "habit_completions", "meals", "shopping_items",
     "reminders", "health_events", "routines", "routine_checks", "push_subscriptions",
+    "anniversaries", "anniversary_prefs",
 }
 
 
@@ -136,6 +137,7 @@ INDEXES: dict[str, list[IndexModel]] = {
         IndexModel([("bouquetId", ASCENDING), ("viewerId", ASCENDING)], name="bouquet_viewer", unique=True),
         IndexModel([("viewerId", ASCENDING), ("ownerId", ASCENDING)], name="viewer_owner"),
     ],
+    "anniversaries": [IndexModel([("ownerId", ASCENDING), ("id", ASCENDING)], name="owner_id", unique=True)],
     "strava_connections": [IndexModel([("user_id", ASCENDING)], name="user", unique=True)],
     "oauth_states": [
         IndexModel([("state", ASCENDING)], name="state", unique=True),

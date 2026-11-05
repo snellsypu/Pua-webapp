@@ -12,6 +12,7 @@ import Sharing from "@/pages/Sharing";
 import SharedPlannerPage from "@/pages/SharedPlanner";
 import JoinBouquet from "@/pages/JoinBouquet";
 import StatsPage from "@/pages/Stats";
+import Anniversaries from "@/pages/Anniversaries";
 import { PaymentCancel, PaymentSuccess } from "@/pages/Payment";
 import { AuthGate } from "@/lib/auth";
 
@@ -35,6 +36,7 @@ export default function App() {
         <Route path="/shared/:ownerId" element={<SharedPlannerPage />} />
         <Route path="/join/:code" element={<JoinBouquet />} />
         <Route path="/stats" element={<StatsPage />} />
+        <Route path="/anniversaries" element={<Anniversaries />} />
         <Route path="/payment/success" element={<PaymentSuccess />} />
         <Route path="/payment/cancel" element={<PaymentCancel />} />
         <Route path="*" element={<NotFound />} />

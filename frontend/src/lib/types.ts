@@ -566,3 +566,33 @@ export interface StravaStatus {
 export interface StravaConnectOut {
   url: string;
 }
+
+// Mirrors backend/routers/anniversaries.py
+export type AnniversaryKind = "birthday" | "anniversary" | "event";
+export interface AnniversaryIn {
+  title: string;
+  kind: AnniversaryKind;
+  date: string; // MM-DD, repeats yearly
+  year: number | null; // birth / wedding year
+  emoji: string;
+}
+export interface Anniversary extends AnniversaryIn {
+  id: string;
+}
+export interface UpcomingEvent {
+  id: string;
+  title: string;
+  emoji: string;
+  kind: AnniversaryKind | "holiday";
+  holidaySet: string | null;
+  next: string; // YYYY-MM-DD
+  daysUntil: number;
+  years: number | null;
+  custom: Anniversary | null;
+}
+export interface HolidaySetState {
+  id: string;
+  label: string;
+  group: string;
+  enabled: boolean;
+}

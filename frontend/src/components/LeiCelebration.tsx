@@ -1,6 +1,7 @@
 // Lei milestones: when a routine's streak reaches a multiple of 7, flowers rain down
 // and PUA says "Your lei is complete!". Fire with celebrateIfLeiComplete(prev, next).
 import { useEffect, useState } from "react";
+import { playBirdsong } from "@/lib/birdsong";
 import { AnimatePresence, motion } from "motion/react";
 import type { RoutineState } from "@/lib/types";
 import { speak, speakEnabled } from "@/lib/speech";
@@ -9,6 +10,8 @@ import { Flower, FLOWER_KINDS } from "@/components/Flower";
 const EVENT = "pua:lei-complete";
 
 export function celebrateIfLeiComplete(prev: RoutineState | undefined, next: RoutineState) {
+  const lei = next.complete && next.streak > 0 && next.streak % 7 === 0 && (prev?.streak ?? 0) < next.streak;
+  if (next.complete && !prev?.complete && !lei) playBirdsong(); // routine finished
   if (next.complete && next.streak > 0 && next.streak % 7 === 0 && (prev?.streak ?? 0) < next.streak) {
     window.dispatchEvent(new CustomEvent(EVENT, { detail: { title: next.title, streak: next.streak } }));
   }
@@ -28,7 +31,8 @@ export function LeiCelebration() {
     const on = (e: Event) => {
       const d = (e as CustomEvent<{ title: string; streak: number }>).detail;
       setShow(d);
-      if (speakEnabled()) void speak("Your lei is complete!");
+      playBirdsong();
+      if (speakEnabled()) window.setTimeout(() => void speak("Your lei is complete!"), 900);
       window.setTimeout(() => setShow(null), 4200);
     };
     window.addEventListener(EVENT, on);
