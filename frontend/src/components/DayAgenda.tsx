@@ -1,3 +1,4 @@
+import { GoingLine } from "@/components/AppointmentJoin";
 import { Lock, MapPin, MessageCircle, Pencil, Trash2 } from "lucide-react";
 import { useNoteCounts } from "@/components/BouquetNotes";
 import { Button } from "@/components/ui/button";
@@ -45,6 +46,15 @@ export function DayAgenda({
                 </span>
               )}
             </div>
+            {a.joinedFrom && (
+              <div className="text-xs text-emerald-700 dark:text-emerald-300" data-testid={`appointment-joined-${a.id}`}>👥 With {a.joinedFrom.ownerName.split(" ")[0]}</div>
+            )}
+            {!a.joinedFrom && a.attendees.some((x) => x.status === "pending") && (
+              <div className="text-xs font-medium text-amber-700 dark:text-amber-300" data-testid={`appointment-requests-${a.id}`}>
+                🙋 {a.attendees.filter((x) => x.status === "pending").length} asking to join — tap edit to approve
+              </div>
+            )}
+            {!a.joinedFrom && <GoingLine attendees={a.attendees} />}
             {a.location && (
               <div className="flex items-center gap-1 text-xs text-muted-foreground">
                 <MapPin className="size-3 shrink-0" />

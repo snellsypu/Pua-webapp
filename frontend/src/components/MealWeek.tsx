@@ -5,9 +5,10 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Loader2, Lock, Plus, ShoppingCart, Sparkles, Trash2, X } from "lucide-react";
 import { apiDelete, apiGet, apiPost, apiPut } from "@/lib/api";
-import type { AppSettings, FavouriteMeal, Person, Meal, MealSlot, MealUpsert, Recipe, ShoppingSuggestion } from "@/lib/types";
+import type { AppSettings, Cook, FavouriteMeal, Person, Meal, MealSlot, MealUpsert, Recipe, ShoppingSuggestion } from "@/lib/types";
 import { addDaysIso, fmtShort } from "@/lib/dates";
 import { usePaywall, usePremium } from "@/components/Paywall";
+import { useMe } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -39,12 +40,25 @@ function MealDialog({ base, target, onClose }: { base: string; target: Target | 
   const [items, setItems] = useState<string[]>([]);
   const [draft, setDraft] = useState("");
   const [remembered, setRemembered] = useState(false);
+  const [cooks, setCooks] = useState<Cook[]>([]);
+  const me = useMe();
+  const cooking = cooks.some((c) => c.user_id === me.data?.user_id);
+  const toggleCook = useMutation({
+    mutationFn: () => apiPost<Meal>(`${base}/${target!.meal!.id}/cook`),
+    onSuccess: (m) => {
+      setCooks(m.cooks);
+      invalidate();
+      toast.success(m.cooks.some((c) => c.user_id === me.data?.user_id) ? "You're cooking 👩‍🍳 — everyone can see" : "You've stepped back from cooking");
+    },
+    onError: () => toast.error("Couldn't update who's cooking"),
+  });
 
   useEffect(() => {
     setTitle(target?.meal?.title ?? "");
     setItems(target?.meal?.ingredients ?? []);
     setDraft("");
     setRemembered(false);
+    setCooks(target?.meal?.cooks ?? []);
   }, [target]);
 
   const slotInfo = SLOTS.find((s) => s.slot === target?.slot);
@@ -149,6 +163,16 @@ function MealDialog({ base, target, onClose }: { base: string; target: Target | 
               {!items.length && <li className="text-xs text-muted-foreground">No ingredients yet.</li>}
             </ul>
           </div>
+          {target?.meal && (
+            <div className="flex items-center gap-2 rounded-xl bg-orange-500/10 px-3 py-2" data-testid="meal-dialog-cooks">
+              <span className="min-w-0 flex-1 text-sm" data-testid="meal-dialog-cooks-names">
+                👩‍🍳 {cooks.length ? `Cooking: ${cooks.map((c) => c.name.split(" ")[0]).join(", ")}` : "Nobody's cooking yet"}
+              </span>
+              <Button size="xs" variant={cooking ? "outline" : "default"} disabled={toggleCook.isPending} onClick={() => toggleCook.mutate()} data-testid="meal-dialog-cook-toggle">
+                {cooking ? "Step back" : cooks.length ? "I'll help" : "I'll cook"}
+              </Button>
+            </div>
+          )}
           <div className="flex justify-between gap-2">
             {target?.meal ? (
               <Button variant="ghost" onClick={() => remove.mutate()} disabled={remove.isPending} data-testid="meal-dialog-delete">
@@ -196,6 +220,11 @@ export function MealWeek({ base, weekStart, today }: { base: string; weekStart: 
                       <span className="block text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{s.emoji} {s.label}</span>
                       <span className="block truncate text-sm font-medium" data-testid={`meal-cell-title-${d}-${s.slot}`}>{meal?.title ?? "+ Plan"}</span>
                       {!!meal?.ingredients.length && <span className="block text-[10px] text-muted-foreground">{meal.ingredients.length} ingredients</span>}
+                      {!!meal?.cooks.length && (
+                        <span className="block truncate text-[10px] font-medium text-orange-700 dark:text-orange-300" data-testid={`meal-cell-cooks-${d}-${s.slot}`}>
+                          👩‍🍳 {meal.cooks.map((c) => c.name.split(" ")[0]).join(", ")}
+                        </span>
+                      )}
                     </button>
                   );
                 })}

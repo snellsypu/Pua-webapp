@@ -7,6 +7,7 @@ TS interfaces in frontend/src/lib/types.ts — keep the two in sync in one edit.
 import re
 import uuid
 from datetime import datetime, timezone
+from typing import Literal
 from zoneinfo import ZoneInfo
 
 from pydantic import BaseModel, Field, field_validator
@@ -192,6 +193,20 @@ class SettingsUpdate(BaseModel):
 # ---------------------------------------------------------------- appointments
 
 
+class Attendee(BaseModel):
+    """A bouquet friend on someone's appointment: asked to join (pending) or going."""
+    user_id: str
+    name: str
+    status: Literal["pending", "going"] = "going"
+
+
+class JoinedFrom(BaseModel):
+    """Set on your copy of a friend's appointment you joined (kept in sync with theirs)."""
+    ownerId: str
+    ownerName: str
+    appointmentId: str
+
+
 class Appointment(BaseModel):
     id: str = Field(default_factory=_uuid)
     title: str
@@ -205,6 +220,9 @@ class Appointment(BaseModel):
     locationLat: float | None = Field(default=None, ge=-90, le=90)
     locationLon: float | None = Field(default=None, ge=-180, le=180)
     private: bool = False  # friends see a blank "Unavailable" block instead
+    openToJoin: bool = False  # bouquet friends join straight away; otherwise the owner approves
+    attendees: list[Attendee] = Field(default_factory=list)
+    joinedFrom: JoinedFrom | None = None
     createdAt: datetime = Field(default_factory=_now)
 
     @field_validator("date")
@@ -229,6 +247,7 @@ class AppointmentCreate(BaseModel):
     locationLat: float | None = Field(default=None, ge=-90, le=90)
     locationLon: float | None = Field(default=None, ge=-180, le=180)
     private: bool = False
+    openToJoin: bool = False
 
     @field_validator("travelMode")
     @classmethod
@@ -257,6 +276,7 @@ class AppointmentUpdate(BaseModel):
     locationLat: float | None = Field(default=None, ge=-90, le=90)  # explicit null = free text
     locationLon: float | None = Field(default=None, ge=-180, le=180)
     private: bool | None = None
+    openToJoin: bool | None = None
 
     @field_validator("travelMode")
     @classmethod
@@ -377,6 +397,11 @@ class HabitLog(BaseModel):
 # ---------------------------------------------------------------- meals
 
 
+class Cook(BaseModel):
+    user_id: str
+    name: str
+
+
 class Meal(BaseModel):
     id: str = Field(default_factory=_uuid)
     date: str
@@ -384,6 +409,7 @@ class Meal(BaseModel):
     title: str
     notes: str = ""
     ingredients: list[str] = Field(default_factory=list)
+    cooks: list[Cook] = Field(default_factory=list)  # who's cooking (several can help)
 
     @field_validator("date")
     @classmethod

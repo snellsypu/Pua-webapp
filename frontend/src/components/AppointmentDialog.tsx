@@ -3,9 +3,9 @@ import { OwnerAppointmentNotes } from "@/components/BouquetNotes";
 import { Flower } from "@/components/Flower";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Loader2, Lock, MapPin, Search, Trash2 } from "lucide-react";
+import { Loader2, Lock, MapPin, Search, Trash2, UserPlus } from "lucide-react";
 import { apiDelete, apiGet, apiPost, apiPut, ApiError } from "@/lib/api";
-import type { AppSettings, Appointment, GeoPlace, TravelMode } from "@/lib/types";
+import type { AppSettings, Appointment, Attendee, GeoPlace, JoinedFrom, TravelMode } from "@/lib/types";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 /** "Reading, Station Hill, Reading, England, RG1 1LZ, UK" → "Reading, Station Hill, Reading" */
@@ -29,6 +29,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { AttendeeManager } from "@/components/AppointmentJoin";
 
 export interface AppointmentDraft {
   id?: string;
@@ -42,6 +43,9 @@ export interface AppointmentDraft {
   locationLat?: number | null;
   locationLon?: number | null;
   private?: boolean;
+  openToJoin?: boolean;
+  attendees?: Attendee[];
+  joinedFrom?: JoinedFrom | null;
 }
 
 export function AppointmentDialog({
@@ -59,6 +63,7 @@ export function AppointmentDialog({
   const premium = settings.data?.premiumVoice ?? false;
   const [travel, setTravel] = useState<TravelMode | "default">("default");
   const [isPrivate, setIsPrivate] = useState(false);
+  const [openToJoin, setOpenToJoin] = useState(false);
   const [coords, setCoords] = useState<{ lat: number; lon: number } | null>(null);
   const [places, setPlaces] = useState<GeoPlace[] | null>(null);
   const find = useMutation({
@@ -87,6 +92,7 @@ export function AppointmentDialog({
       });
       setTravel(initial?.travelMode ?? "default");
       setIsPrivate(initial?.private ?? false);
+      setOpenToJoin(initial?.openToJoin ?? false);
       setCoords(initial?.locationLat != null && initial?.locationLon != null ? { lat: initial.locationLat, lon: initial.locationLon } : null);
       setPlaces(null);
     }
@@ -111,6 +117,7 @@ export function AppointmentDialog({
         locationLat: form.location.trim() && coords ? coords.lat : null,
         locationLon: form.location.trim() && coords ? coords.lon : null,
         private: isPrivate,
+        ...(initial?.joinedFrom ? {} : { openToJoin: !isPrivate && openToJoin }),
         // Premium only; without Premium the field is left untouched.
         ...(premium ? { travelMode: travel === "default" ? null : travel } : {}),
       };
@@ -295,6 +302,34 @@ export function AppointmentDialog({
               <span className={`absolute top-0.5 size-4 rounded-full bg-background shadow transition-transform duration-150 ${isPrivate ? "translate-x-4" : "translate-x-0.5"}`} />
             </span>
           </button>
+          {initial?.joinedFrom ? (
+            <p className="rounded-xl bg-emerald-500/10 px-3 py-2 text-xs text-emerald-900 dark:text-emerald-200" data-testid="appointment-joined-from">
+              👥 You joined this from {initial.joinedFrom.ownerName.split(" ")[0]}&apos;s calendar — their changes to the time and place follow here. Delete it to leave.
+            </p>
+          ) : !isPrivate && (
+            <button
+              type="button"
+              role="switch"
+              aria-checked={openToJoin}
+              onClick={() => setOpenToJoin((v) => !v)}
+              data-testid="appointment-open-toggle"
+              className={`flex items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition-[background-color,border-color] duration-150 ${openToJoin ? "border-primary/60 bg-primary/10" : "hover:bg-accent"}`}
+            >
+              <span className={`grid size-8 shrink-0 place-items-center rounded-lg ${openToJoin ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
+                <UserPlus className="size-4" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-medium">Open to join</span>
+                <span className="block text-xs text-muted-foreground">
+                  {openToJoin ? "Bouquet friends can add themselves straight away" : "Bouquet friends can ask — you approve each one"}
+                </span>
+              </span>
+              <span className={`relative h-5 w-9 shrink-0 rounded-full transition-colors duration-150 ${openToJoin ? "bg-primary" : "bg-muted-foreground/30"}`}>
+                <span className={`absolute top-0.5 size-4 rounded-full bg-background shadow transition-transform duration-150 ${openToJoin ? "translate-x-4" : "translate-x-0.5"}`} />
+              </span>
+            </button>
+          )}
+          {isEdit && !initial?.joinedFrom && !!initial?.attendees?.length && <AttendeeManager appointmentId={initial.id!} initial={initial.attendees} />}
           {isEdit && !isPrivate && <OwnerAppointmentNotes appointmentId={initial!.id!} />}
           <div className="grid gap-1.5">
             <Label htmlFor="appt-notes">Notes</Label>

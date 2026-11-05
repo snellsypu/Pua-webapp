@@ -440,3 +440,71 @@ async def friend_suggestions(owner_id: str, request: Request, from_: str = Query
     finally:
         current_owner.reset(token)
     return meals.suggestions_for(planned, await meals.my_list_names())
+
+
+# ---------------------------------------------------------------- joining a friend's appointment
+
+
+async def _joinable(owner_id: str, appointment_id: str, request: Request) -> tuple[dict, dict]:
+    owner, cats, _ = await _owner_for(owner_id, _uid(request))
+    if "appointments" not in cats:
+        raise HTTPException(status_code=403, detail="This bouquet doesn't share appointments")
+    doc = await raw_db.appointments.find_one({"ownerId": owner_id, "id": appointment_id}, {"_id": 0})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Appointment not found")
+    if doc.get("private") or doc.get("joinedFrom"):
+        raise HTTPException(status_code=403, detail="You can't join this appointment")
+    return owner, doc
+
+
+@router.post("/planner/{owner_id}/appointments/{appointment_id}/join", response_model=Appointment)
+async def join_appointment(owner_id: str, appointment_id: str, request: Request):
+    """Open appointments: you're going and it's copied to your calendar. Otherwise: a request."""
+    from lib import push as push_lib
+    from routers.appointments import add_copy
+
+    owner, doc = await _joinable(owner_id, appointment_id, request)
+    me = request.state.user
+    if not any(a["user_id"] == me["user_id"] for a in doc.get("attendees", [])):
+        status = "going" if doc.get("openToJoin") else "pending"
+        await raw_db.appointments.update_one(
+            {"ownerId": owner_id, "id": appointment_id},
+            {"$push": {"attendees": {"user_id": me["user_id"], "name": me.get("name", "Friend"), "status": status}}})
+        first = me.get("name", "A friend").split(" ")[0]
+        token = current_owner.set(owner_id)
+        try:
+            await push_lib.send_to_all(
+                "New guest 👋" if status == "going" else "Join request 🙋",
+                f"{first} joined {doc['title']}" if status == "going" else f"{first} asked to join {doc['title']}",
+                url="/calendar", tag="appt-join")
+        finally:
+            current_owner.reset(token)
+        doc = await raw_db.appointments.find_one({"ownerId": owner_id, "id": appointment_id}, {"_id": 0})
+    if any(a["user_id"] == me["user_id"] and a["status"] == "going" for a in doc.get("attendees", [])):
+        await add_copy(doc, owner.get("name", "Friend"), me["user_id"])
+    return Appointment(**doc)
+
+
+@router.delete("/planner/{owner_id}/appointments/{appointment_id}/join", response_model=Appointment)
+async def leave_appointment(owner_id: str, appointment_id: str, request: Request):
+    """Leave (or withdraw your request) — your copy is removed."""
+    from routers.appointments import remove_copy
+
+    _, doc = await _joinable(owner_id, appointment_id, request)
+    uid = _uid(request)
+    await raw_db.appointments.update_one({"ownerId": owner_id, "id": appointment_id},
+                                         {"$pull": {"attendees": {"user_id": uid}}})
+    await remove_copy(owner_id, appointment_id, uid)
+    doc["attendees"] = [a for a in doc.get("attendees", []) if a["user_id"] != uid]
+    return Appointment(**doc)
+
+
+@router.post("/planner/{owner_id}/meals/{meal_id}/cook", response_model=Meal)
+async def friend_toggle_cook(owner_id: str, meal_id: str, request: Request):
+    from routers import meals
+
+    token = current_owner.set(await _meals_owner(owner_id, request))
+    try:
+        return await meals.toggle_cook(meal_id, request.state.user)
+    finally:
+        current_owner.reset(token)

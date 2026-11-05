@@ -26,6 +26,7 @@ import type {
 import { useToggleHabit } from "@/components/HabitList";
 import { addDaysIso, fmtDay } from "@/lib/dates";
 import { DayAgenda } from "@/components/DayAgenda";
+import { FriendJoinButton } from "@/components/AppointmentJoin";
 import { MealSlots } from "@/components/MealSlots";
 import { ReminderList } from "@/components/ReminderList";
 import { AppointmentDialog, type AppointmentDraft } from "@/components/AppointmentDialog";
@@ -272,6 +273,7 @@ export default function Calendar() {
                           {a.private && <Lock className="size-3 shrink-0" />}{a.title}
                         </span>
                         <span className="block text-xs text-muted-foreground">{f.owner.name.split(" ")[0]}</span>
+                        {!a.private && <FriendJoinButton ownerId={f.owner.user_id} appt={a} />}
                       </span>
                     </li>
                   ))}

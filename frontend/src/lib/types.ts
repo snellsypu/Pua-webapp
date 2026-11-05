@@ -110,6 +110,19 @@ export interface Appointment {
   locationLat: number | null; // set when picked from address search
   locationLon: number | null;
   private: boolean; // friends see a blank "Unavailable" block
+  openToJoin: boolean; // bouquet friends join straight away; otherwise the owner approves
+  attendees: Attendee[];
+  joinedFrom: JoinedFrom | null; // set on your copy of a friend's appointment
+}
+export interface Attendee {
+  user_id: string;
+  name: string;
+  status: "pending" | "going";
+}
+export interface JoinedFrom {
+  ownerId: string;
+  ownerName: string;
+  appointmentId: string;
 }
 
 export interface AppointmentCreate {
@@ -123,6 +136,7 @@ export interface AppointmentCreate {
   locationLat?: number | null;
   locationLon?: number | null;
   private?: boolean;
+  openToJoin?: boolean;
 }
 
 export type HabitMode = "streak" | "monthly";
@@ -181,6 +195,11 @@ export interface Meal {
   title: string;
   notes: string;
   ingredients: string[];
+  cooks: Cook[]; // who's cooking — several can help
+}
+export interface Cook {
+  user_id: string;
+  name: string;
 }
 export interface MealUpsert {
   date: string;

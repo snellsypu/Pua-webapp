@@ -9,7 +9,7 @@ import re
 import uuid
 
 from emergentintegrations.llm.chat import LlmChat, StreamDone, TextDelta, UserMessage
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
 from pymongo import ASCENDING, ReturnDocument
 
 from lib.db import current_owner, db
@@ -135,6 +135,24 @@ async def upsert_meal(input: MealUpsert):
     meal = Meal(date=input.date, slot=input.slot, **fields)
     await db.meals.insert_one(meal.model_dump())
     return meal
+
+
+async def toggle_cook(id: str, user: dict) -> Meal:
+    """Add yourself as a cook on this meal, or step back if you already are (several can help)."""
+    doc = await db.meals.find_one({"id": id})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Meal not found")
+    uid = user["user_id"]
+    if any(c["user_id"] == uid for c in doc.get("cooks", [])):
+        change = {"$pull": {"cooks": {"user_id": uid}}}
+    else:
+        change = {"$push": {"cooks": {"user_id": uid, "name": user.get("name", "Someone")}}}
+    return Meal(**await db.meals.find_one_and_update({"id": id}, change, return_document=ReturnDocument.AFTER))
+
+
+@router.post("/{id}/cook", response_model=Meal)
+async def toggle_my_cook(id: str, request: Request):
+    return await toggle_cook(id, request.state.user)
 
 
 @router.delete("/{id}")

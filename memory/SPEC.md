@@ -410,3 +410,19 @@ Gift ideas have a 🛒 button in the event dialog → POST /api/shopping.
 - **Push alerts**: push cron `_anniversary_alert` — once a day at/after the morning routine
   time (before 21:00) sends "Coming up 🎂" for events 7 days and 1 day away (+ gifts);
   claimed via anniversary_prefs.lastAlertDate.
+
+## Joining friends' appointments & who's cooking
+- Appointment: openToJoin (bool), attendees [{user_id, name, status pending|going}], joinedFrom
+  {ownerId, ownerName, appointmentId} (set on a joiner's linked copy).
+- Friend (bouquet shares "appointments", appt not private, not itself a copy):
+  POST /api/sharing/planner/{owner}/appointments/{id}/join → going + copy in my calendar if
+  openToJoin, else pending request (owner gets a push). DELETE same → leave / withdraw (copy removed).
+- Owner: POST /api/appointments/{id}/attendees/{uid}/approve (→ copy + push to them),
+  DELETE /api/appointments/{id}/attendees/{uid} (decline/remove). Owner edits to title/date/times/
+  location sync to copies; owner delete removes copies; deleting your copy = leaving.
+- UI: "Open to join" switch in the appointment dialog, Guests list with Approve/Decline/Remove;
+  Join / Ask to join / Requested / Leave on friend appointments (Calendar friends list + shared
+  planner page); agenda shows "👥 With X", "🙋 N asking to join", "Going: …".
+- Meal.cooks [{user_id, name}] (several can help): POST /api/meals/{id}/cook and
+  /api/sharing/planner/{owner}/meals/{id}/cook toggle me. Meal dialog "I'll cook / I'll help /
+  Step back"; week cells + Today slots show 👩‍🍳 names. Upserts keep cooks.

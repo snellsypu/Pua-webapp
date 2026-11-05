@@ -104,6 +104,11 @@ function SlotRow({
       {meal && (
         <div className="mt-1 text-sm font-medium" data-testid={`meal-title-${slot}`}>
           {meal.title}
+          {!!meal.cooks.length && (
+            <span className="ml-2 text-xs font-normal text-orange-700 dark:text-orange-300" data-testid={`meal-cooks-${slot}`}>
+              👩‍🍳 {meal.cooks.map((c) => c.name.split(" ")[0]).join(", ")}
+            </span>
+          )}
         </div>
       )}
       <div className="mt-2 flex gap-1.5">
