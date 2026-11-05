@@ -17,6 +17,7 @@ from lib.auth import new_friend_code
 from lib.dates import today_iso
 from lib.db import current_owner, raw_db
 from models.auth import (
+    Leaderboard, LeaderboardEntry,
     Bouquet, BouquetCreate, BouquetUpdate, FriendColorIn, JoinedPlanner, JoinIn, Person, SharingState,
 )
 from models.planner import Appointment, ShoppingCreate, ShoppingItem, ShoppingUpdate
@@ -159,6 +160,43 @@ async def remove_member(bid: str, viewer_id: str, request: Request):
     await _own_bouquet(bid, uid)
     await raw_db.bouquet_members.delete_one({"bouquetId": bid, "viewerId": viewer_id})
     return await _state(uid)
+
+
+async def _month_lei(uid: str, month: str) -> tuple[int, int]:
+    """(longest run of consecutive days with any finished routine this month, days finished)."""
+    days = sorted({c["date"] async for c in raw_db.routine_checks.find(
+        {"ownerId": uid, "complete": True, "date": {"$regex": f"^{month}-"}}, {"date": 1})})
+    best = run = 0
+    prev: date | None = None
+    for d in (date.fromisoformat(x) for x in days):
+        run = run + 1 if prev and (d - prev).days == 1 else 1
+        best, prev = max(best, run), d
+    return best, len(days)
+
+
+@router.get("/bouquets/{bid}/leaderboard", response_model=Leaderboard)
+async def leaderboard(bid: str, request: Request):
+    """Everyone in a bouquet (owner + members) ranked by their longest lei this month."""
+    uid = _uid(request)
+    b = await raw_db.bouquets.find_one({"id": bid})
+    if not b or (b["ownerId"] != uid and (
+            b["id"] in await paused_ids(b["ownerId"])
+            or not await raw_db.bouquet_members.find_one({"bouquetId": bid, "viewerId": uid}))):
+        raise HTTPException(status_code=404, detail="Bouquet not found")
+    ids = [b["ownerId"]] + [m["viewerId"] async for m in raw_db.bouquet_members.find({"bouquetId": bid})]
+    month = today_iso()[:7]
+    rows = []
+    async for u in raw_db.users.find({"user_id": {"$in": ids}}, {"_id": 0}):
+        lei, finished = await _month_lei(u["user_id"], month)
+        rows.append((lei, finished, u))
+    rows.sort(key=lambda r: (-r[0], -r[1], r[2].get("name", "")))
+    entries, rank, last = [], 0, None
+    for i, (lei, finished, u) in enumerate(rows):
+        if (lei, finished) != last:
+            rank, last = i + 1, (lei, finished)
+        entries.append(LeaderboardEntry(**_person(u).model_dump(), longestLei=lei, daysFinished=finished,
+                                        isOwner=u["user_id"] == b["ownerId"], me=u["user_id"] == uid, rank=rank))
+    return Leaderboard(bouquetId=bid, bouquetName=b["name"], month=month, entries=entries)
 
 
 @router.post("/join", response_model=SharingState)

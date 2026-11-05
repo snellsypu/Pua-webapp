@@ -2,6 +2,7 @@
 // choice of what's shared (view-only, plus optional shopping edits). Joining another
 // bouquet never removes you from the first.
 import { useState } from "react";
+import { LeaderboardButton } from "@/components/Leaderboard";
 import { QRCodeSVG } from "qrcode.react";
 import { usePaywall, usePremium } from "@/components/Paywall";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -101,6 +102,7 @@ function BouquetCard({ b }: { b: Bouquet }) {
           <div className="flex items-center gap-1.5">
             <span className="select-all rounded-xl border bg-muted/40 px-3 py-1.5 font-mono text-base font-bold tracking-[0.2em]" data-testid={`${tid}-code`}>{fmtCode(b.code)}</span>
             <Button size="sm" onClick={() => void invite()} data-testid={`${tid}-invite`} title={inviteLink(b.code)}><Link2 className="size-4" /> Invite link</Button>
+            <LeaderboardButton bouquetId={b.id} testid={`${tid}-leaderboard`} />
             <Button size="icon-sm" variant="outline" aria-label="Show QR code" onClick={() => setQr(true)} data-testid={`${tid}-qr`}><QrCode className="size-4" /></Button>
             <Button size="icon-sm" variant="outline" aria-label="Copy code" onClick={() => void copy()} data-testid={`${tid}-copy`}><Copy className="size-4" /></Button>
             <Button size="icon-sm" variant="outline" aria-label="New code" title="New code — members stay" onClick={() => regen.mutate(undefined)} disabled={regen.isPending}
@@ -265,7 +267,8 @@ export default function Sharing() {
                     <span className="block truncate text-sm font-medium">{p.name}</span>
                     <span className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground" data-testid={`joined-bouquets-${p.user_id}`}>
                       {p.bouquets.map((n, i) => (
-                        <span key={p.bouquetIds[i] ?? n} className="inline-flex items-center gap-1"><Flower kind={flowerFor(p.bouquetIds[i])} className="size-3.5" />{n}</span>
+                        <span key={p.bouquetIds[i] ?? n} className="inline-flex items-center gap-1"><Flower kind={flowerFor(p.bouquetIds[i])} className="size-3.5" />{n}
+                          <LeaderboardButton bouquetId={p.bouquetIds[i]} label="" testid={`joined-leaderboard-${p.bouquetIds[i]}`} /></span>
                       ))}
                     </span>
                     <span className="block truncate text-xs text-muted-foreground">

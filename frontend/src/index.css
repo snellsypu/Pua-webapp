@@ -151,3 +151,28 @@
 @media (prefers-reduced-motion: reduce) {
   .pua-bloom { animation: none; }
 }
+
+/* Jungle: a leaf sprig peeks over the top-right corner of every card. */
+[data-slot="card"] {
+  position: relative;
+  isolation: isolate;
+}
+[data-slot="card"]::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 38px;
+  height: 38px;
+  background: url("/leaf-corner.svg") no-repeat top right / contain;
+  opacity: 0.55;
+  pointer-events: none;
+  z-index: -1; /* above the card's own background, below its content */
+  transform-origin: top right;
+  transition: transform 300ms cubic-bezier(0.34, 1.56, 0.64, 1), opacity 300ms ease;
+}
+[data-slot="card"]:hover::before {
+  transform: rotate(-6deg) scale(1.08);
+  opacity: 0.8;
+}
+.dark [data-slot="card"]::before { opacity: 0.35; }

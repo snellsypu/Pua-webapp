@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { StravaCard } from "@/components/StravaCard";
 import { useQuery } from "@tanstack/react-query";
 import { motion } from "motion/react";
 import { Flame, Plus } from "lucide-react";
@@ -73,6 +74,8 @@ export default function Habits() {
           <Plus className="size-4" /> New habit
         </Button>
       </div>
+
+      <StravaCard habits={habits.data ?? []} />
 
       {habits.isLoading ? (
         <div className="h-48 animate-pulse rounded-2xl bg-muted" />

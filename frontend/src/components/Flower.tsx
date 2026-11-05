@@ -4,6 +4,7 @@ import { useId } from "react";
 import { cn } from "@/lib/utils";
 
 import type { FlowerKind } from "@/lib/types";
+import { Orchid } from "@/components/Jungle";
 
 export type { FlowerKind };
 export const FLOWER_KINDS: FlowerKind[] = ["plumeria", "hibiscus", "pink-plumeria", "ilima", "lehua"];
@@ -116,11 +117,11 @@ export function FlowerTick({ kind, className }: { kind?: FlowerKind; className?:
   return <Flower kind={kind} className={cn("pua-bloom", className)} />;
 }
 
-/** App logo: a luau plumeria resting above the word PUA. */
+/** App logo: a pink orchid resting above the word PUA. */
 export function PuaLogo({ className, size = "md" }: { className?: string; size?: "md" | "lg" }) {
   return (
     <span className={cn("inline-flex flex-col items-center leading-none", className)} data-testid="pua-logo">
-      <Flower kind="plumeria" className={cn("drop-shadow-sm", size === "lg" ? "size-12" : "size-6")} title="Plumeria" />
+      <Orchid className={cn("drop-shadow-sm", size === "lg" ? "size-14" : "size-7")} title="Pink orchid" />
       <span className={cn("font-heading font-extrabold tracking-[0.18em] text-primary", size === "lg" ? "mt-1 text-2xl" : "-mt-0.5 text-[11px]")}>
         PUA
       </span>

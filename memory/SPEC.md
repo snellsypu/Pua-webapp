@@ -296,7 +296,12 @@ Emergent-managed Google sign-in (lib/auth.py, routers/auth.py, frontend lib/auth
   picks one deterministically; `.pua-bloom` keyframe (index.css) pops them open.
 - Every tick blooms: ui/checkbox.tsx (round bud → flower, kind from id/data-testid), habit
   check buttons, shared-planner habits, onboarding packs, routine "All done", theme choice.
-- Logo `PuaLogo`: luau plumeria above the word PUA (header, sign-in); favicon.svg plumeria.
+- Logo `PuaLogo`: pink orchid (components/Jungle.tsx `Orchid`) above the word PUA (header,
+  sign-in); favicon + home-screen icons are the orchid too. Flower ticks stay Hawaiian.
+- Jungle look: `JungleBackdrop` (fixed, behind content: vines down both edges, monstera +
+  leaves in bottom corners, softer in dark mode), `VineGarland` under the header
+  (public/vine-garland.svg), and a leaf sprig on every card's top-right corner via
+  `[data-slot=card]::before` (public/leaf-corner.svg, z-index -1, wiggles on hover).
   Home-screen icons (public/icon-192.png, icon-512.png also maskable, apple-touch-icon.png,
   favicon PNG/ICO) are the plumeria-over-PUA artwork, rendered from SVG with headless Chrome.
 - **Lei streaks** (components/Lei.tsx, in each RoutineCard): one flower per day of the
@@ -334,3 +339,23 @@ when the profile's currentStreak.endDate == local today it ticks the habit (sour
   routine completes and its streak hits a multiple of 7 → falling flowers + card + spoken
   "Your lei is complete!" (if spoken replies are on). Called from RoutineCard, hands-free and
   voice check-offs.
+
+## Bouquet leaderboard
+GET /api/sharing/bouquets/{id}/leaderboard (owner or member of an active bouquet; else 404) →
+{bouquetName, month, entries[{person, longestLei (longest run this month of days with any
+finished routine), daysFinished, isOwner, me, rank}]}. Trophy button on each bouquet card and
+next to each joined bouquet name (components/Leaderboard.tsx).
+
+## Stats share card
+components/ShareStatsCard.tsx draws a 1080×1350 PNG on canvas (plumeria garland, logo, leis,
+days with PUA, active days, best streaks, totals) → navigator.share with the file, else download.
+
+## Strava (routers/strava.py, OAuth2 activity:read)
+Needs STRAVA_CLIENT_ID/STRAVA_CLIENT_SECRET; callback domain = the app host at
+strava.com/settings/api. POST /strava/connect {origin_url} → authorize URL (state in
+`oauth_states`, TTL); GET /strava/callback (public) exchanges code, stores
+`strava_connections` {user_id, tokens, athleteName, habitId (defaults to first distance
+habit)}, first sync, redirects /habits?strava=connected|denied|scope|error. GET /status,
+PUT /habit {habitId}, POST /sync, DELETE (deauthorize). Sync (cron ≤30 min, last 7 days):
+Run/TrailRun/VirtualRun per local day → habit_completions source "strava" (+distanceKm when
+the habit tracks distance; never overwrites manual ticks). UI: StravaCard on Habits page.

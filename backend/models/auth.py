@@ -71,6 +71,21 @@ class BouquetUpdate(BaseModel):
     shoppingEdit: bool | None = None
 
 
+class LeaderboardEntry(Person):
+    longestLei: int  # longest run of finished-routine days this month
+    daysFinished: int  # days this month with a finished routine
+    isOwner: bool
+    me: bool
+    rank: int
+
+
+class Leaderboard(BaseModel):
+    bouquetId: str
+    bouquetName: str
+    month: str  # YYYY-MM
+    entries: list[LeaderboardEntry]
+
+
 class JoinIn(BaseModel):
     code: str = Field(min_length=4, max_length=16)
 

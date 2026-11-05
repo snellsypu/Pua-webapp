@@ -136,6 +136,11 @@ INDEXES: dict[str, list[IndexModel]] = {
         IndexModel([("bouquetId", ASCENDING), ("viewerId", ASCENDING)], name="bouquet_viewer", unique=True),
         IndexModel([("viewerId", ASCENDING), ("ownerId", ASCENDING)], name="viewer_owner"),
     ],
+    "strava_connections": [IndexModel([("user_id", ASCENDING)], name="user", unique=True)],
+    "oauth_states": [
+        IndexModel([("state", ASCENDING)], name="state", unique=True),
+        IndexModel([("expires_at", ASCENDING)], name="ttl", expireAfterSeconds=0),
+    ],
     "appointment_notes": [
         IndexModel([("ownerId", ASCENDING), ("appointmentId", ASCENDING), ("createdAt", ASCENDING)], name="owner_appt_created"),
         IndexModel([("id", ASCENDING)], name="id", unique=True),

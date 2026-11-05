@@ -1,5 +1,7 @@
 // Stats: leis completed, how long you've been using PUA and lifetime totals.
 import { useQuery } from "@tanstack/react-query";
+import { ShareStatsButton } from "@/components/ShareStatsCard";
+import { useMe } from "@/lib/auth";
 import { motion } from "motion/react";
 import { apiGet } from "@/lib/api";
 import type { Stats } from "@/lib/types";
@@ -23,6 +25,7 @@ function Tile({ id, label, value, sub }: { id: string; label: string; value: str
 export default function StatsPage() {
   const q = useQuery({ queryKey: ["stats"], queryFn: () => apiGet<Stats>("/stats") });
   const s = q.data;
+  const me = useMe();
   return (
     <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="space-y-6" data-testid="stats-page">
       <header className="flex flex-wrap items-end justify-between gap-4">
@@ -32,6 +35,7 @@ export default function StatsPage() {
             {s ? `Using PUA for ${s.daysUsing} day${s.daysUsing === 1 ? "" : "s"} · since ${fmtShort(s.memberSince)}` : "…"}
           </p>
         </div>
+        {s && <ShareStatsButton stats={s} name={me.data?.name.split(" ")[0] ?? "My"} />}
       </header>
 
       <Card className="overflow-hidden" data-testid="stats-leis-card">

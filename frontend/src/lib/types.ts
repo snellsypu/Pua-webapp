@@ -538,3 +538,31 @@ export interface Stats {
   bouquets: number;
   notesWritten: number;
 }
+
+// Mirrors Leaderboard in backend/models/auth.py — longest lei this month per bouquet
+export interface LeaderboardEntry extends Person {
+  longestLei: number;
+  daysFinished: number;
+  isOwner: boolean;
+  me: boolean;
+  rank: number;
+}
+export interface Leaderboard {
+  bouquetId: string;
+  bouquetName: string;
+  month: string;
+  entries: LeaderboardEntry[];
+}
+
+// Mirrors backend/routers/strava.py
+export interface StravaStatus {
+  configured: boolean;
+  connected: boolean;
+  athleteName: string | null;
+  habitId: string | null;
+  lastSync: string | null;
+  lastResult: string | null;
+}
+export interface StravaConnectOut {
+  url: string;
+}

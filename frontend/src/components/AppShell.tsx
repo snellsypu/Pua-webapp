@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { JungleBackdrop, VineGarland } from "@/components/Jungle";
 import { PaywallProvider } from "@/components/Paywall";
 import { LeiCelebration } from "@/components/LeiCelebration";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
@@ -68,8 +69,9 @@ export default function AppShell() {
   return (
     <PaywallProvider>
     <MotionConfig reducedMotion="user">
-      <div className="min-h-svh">
-        <header className="sticky top-0 z-40 border-b bg-background/80 backdrop-blur-md">
+      <JungleBackdrop />
+      <div className="relative z-10 min-h-svh">
+        <header className="sticky top-0 z-40 border-b border-emerald-700/20 bg-background/80 backdrop-blur-md">
           <div className="mx-auto flex h-14 w-full max-w-6xl items-center gap-1 px-4">
             <Link
               to="/"
@@ -127,6 +129,7 @@ export default function AppShell() {
               </NavLink>
             </div>
           </div>
+          <VineGarland className="absolute inset-x-0 -bottom-[7px]" />
         </header>
         <main className="mx-auto w-full max-w-6xl px-4 pb-28 pt-6">
           <Outlet />

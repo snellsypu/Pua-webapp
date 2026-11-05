@@ -61,13 +61,14 @@ async def get_stats(request: Request):
 
     routines: list[RoutineLeis] = []
     active: set[str] = set()
-    for doc in await db.routines.find().to_list(10):
+    titles = {d["kind"]: d.get("title") for d in await db.routines.find().to_list(10)}
+    for kind in ("morning", "bedtime"):
+        doc = {"kind": kind, "title": titles.get(kind) or f"{kind.title()} routine"}
         dates = {c["date"] for c in await db.routine_checks.find({"kind": doc["kind"], "complete": True}).to_list(10000)}
         active |= {c["date"] async for c in db.routine_checks.find({"kind": doc["kind"]}, {"date": 1})}
         streak, best = _streaks(dates, today)
         routines.append(RoutineLeis(kind=doc["kind"], title=doc.get("title", doc["kind"].title()),
                                     leis=_leis(dates), completeDays=len(dates), streak=streak, bestStreak=best))
-    routines.sort(key=lambda r: r.kind != "morning")
 
     completions = await db.habit_completions.find({}, {"habitId": 1, "date": 1}).to_list(100000)
     active |= {c["date"] for c in completions}

@@ -180,6 +180,12 @@ async def _run_for_owner() -> None:
         await sync_duolingo(local_date)
     except Exception:
         logger.exception("duolingo sync failed")
+    try:
+        from routers.strava import sync_strava
+
+        await sync_strava()
+    except Exception:
+        logger.exception("strava sync failed")
     for doc in await ensure_routines():
         if not doc.get("notify") or doc.get("lastNotifiedDate") == local_date:
             continue

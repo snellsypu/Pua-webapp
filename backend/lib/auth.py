@@ -20,7 +20,7 @@ SESSION_DATA_URL = "https://demobackend.emergentagent.com/auth/v1/env/oauth/sess
 
 # Signed-out endpoints: the sign-in exchange, the who-am-I probe (answers 401), logout,
 # and the platform cron webhook (guarded by its own WEBHOOK_CRON_SECRET).
-PUBLIC_PATHS = {"/api/auth/session", "/api/auth/me", "/api/auth/logout", "/api/cron/routines", "/api/stripe/webhook"}
+PUBLIC_PATHS = {"/api/auth/session", "/api/auth/me", "/api/auth/logout", "/api/cron/routines", "/api/stripe/webhook", "/api/strava/callback"}
 
 _CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"  # no 0/O/1/I
 
