@@ -46,7 +46,7 @@ export function PaymentSuccess() {
       </>}
       {state === "failed" && <p className="font-heading text-xl font-bold" data-testid="payment-failed">The payment didn&apos;t go through — nothing was charged.</p>}
       {state === "timeout" && <p className="text-sm text-muted-foreground" data-testid="payment-timeout">Still confirming with Stripe — check Settings in a minute.</p>}
-      {state !== "paid" && <Link to="/settings" className="text-sm text-primary underline">Back to Settings</Link>}
+      {state !== "paid" && <Link to="/settings?tab=premium" className="text-sm text-primary underline">Back to Settings</Link>}
     </div>
   );
 }
@@ -57,7 +57,7 @@ export function PaymentCancel() {
       <Flower kind="plumeria" className="size-14 opacity-70" />
       <p className="font-heading text-xl font-bold">Checkout cancelled</p>
       <p className="text-sm text-muted-foreground">Nothing was charged. You can go Premium any time from Settings.</p>
-      <Link to="/settings" className="text-sm text-primary underline" data-testid="payment-cancel-back">Back to Settings</Link>
+      <Link to="/settings?tab=premium" className="text-sm text-primary underline" data-testid="payment-cancel-back">Back to Settings</Link>
     </div>
   );
 }

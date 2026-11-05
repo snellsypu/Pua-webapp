@@ -86,3 +86,52 @@ async def get_stats(request: Request):
         bouquets=await raw_db.bouquets.count_documents({"ownerId": uid}),
         notesWritten=await raw_db.appointment_notes.count_documents({"authorId": uid}),
     )
+
+
+# ---------------------------------------------------------------- work rota hours
+
+
+class JobHours(BaseModel):
+    jobId: str
+    name: str
+    weekHours: float
+    weekShifts: int
+    monthHours: float
+    monthShifts: int
+
+
+class WorkHours(BaseModel):
+    weekStart: str  # Monday of this week
+    weekEnd: str
+    month: str  # YYYY-MM
+    jobs: list[JobHours]
+
+
+def _hours(b) -> float:
+    s = int(b.startTime[:2]) * 60 + int(b.startTime[3:])
+    e = int(b.endTime[:2]) * 60 + int(b.endTime[3:])
+    return ((e - s) % 1440 or 1440) / 60  # overnight shifts wrap; equal times = 24h
+
+
+@router.get("/work", response_model=WorkHours)
+async def work_hours():
+    """Scheduled hours per job this week (Mon–Sun) and this calendar month, from the rota."""
+    from datetime import timedelta
+
+    from lib.work import my_blocks
+
+    today = date.fromisoformat(today_iso())
+    ws = today - timedelta(days=today.weekday())
+    we = ws + timedelta(days=6)
+    ms = today.replace(day=1)
+    me = (ms.replace(year=ms.year + 1, month=1) if ms.month == 12 else ms.replace(month=ms.month + 1)) - timedelta(days=1)
+    blocks = await my_blocks(min(ws, ms).isoformat(), max(we, me).isoformat())
+    jobs = await db.jobs.find({}, {"_id": 0, "id": 1, "name": 1}).sort("createdAt", 1).to_list(100)
+    out = []
+    for j in jobs:
+        mine = [b for b in blocks if b.jobId == j["id"]]
+        wk = [b for b in mine if ws.isoformat() <= b.date <= we.isoformat()]
+        mo = [b for b in mine if ms.isoformat() <= b.date <= me.isoformat()]
+        out.append(JobHours(jobId=j["id"], name=j["name"], weekHours=round(sum(map(_hours, wk)), 2), weekShifts=len(wk),
+                            monthHours=round(sum(map(_hours, mo)), 2), monthShifts=len(mo)))
+    return WorkHours(weekStart=ws.isoformat(), weekEnd=we.isoformat(), month=ms.strftime("%Y-%m"), jobs=out)

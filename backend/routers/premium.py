@@ -1,6 +1,6 @@
 """Premium — real Stripe subscriptions (claimable sandbox, test mode for now).
 
-Plans £2.99/month and £24.99/year live in Stripe (setup_stripe.py, looked up by
+Plans £4.99/month and £50/year live in Stripe (setup_stripe.py, looked up by
 lookup_key). Checkout → Stripe-hosted page → /payment/success polls /premium/status/{id};
 the webhook (/api/stripe/webhook) and the status poll both activate Premium idempotently.
 Premium unlocks AI voice, per-appointment travel modes, live-location commutes, more than
@@ -27,8 +27,8 @@ TAX_MODE = "full"  # digital subscription in an SMP country → Stripe manages t
 FREE_BOUQUETS = 1
 FREE_GROUP_SIZE = 6  # people per bouquet including its owner
 PRICES = [
-    PremiumPrice(plan="monthly", label="£2.99 / month", amount=2.99),
-    PremiumPrice(plan="yearly", label="£24.99 / year", amount=24.99),
+    PremiumPrice(plan="monthly", label="£4.99 / month", amount=4.99),
+    PremiumPrice(plan="yearly", label="£50 / year", amount=50.0),
 ]
 LOOKUP = {"monthly": "pua_premium_monthly", "yearly": "pua_premium_yearly"}
 

@@ -7,7 +7,10 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { motion } from "motion/react";
 import { toast } from "sonner";
 import { useTheme } from "next-themes";
-import { LocateFixed, MapPin, Search } from "lucide-react";
+import { AlarmClock, LocateFixed, MapPin, Search, SlidersHorizontal, Sparkles, UserRound } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
+import { PremiumFeaturesCard } from "@/components/Paywall";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { apiGet, apiPut } from "@/lib/api";
 import type { AppSettings, GeoPlace, ReversePlace, SettingsUpdate } from "@/lib/types";
 import { NotificationsCard } from "@/components/NotificationsCard";
@@ -33,7 +36,16 @@ const THEME_OPTIONS = [
   { value: "system", label: "System" },
 ] as const;
 
+const SETTINGS_TABS = [
+  { id: "personal", label: "Personal info", icon: UserRound },
+  { id: "alarms", label: "Alarms & reminders", icon: AlarmClock },
+  { id: "app", label: "App settings", icon: SlidersHorizontal },
+  { id: "premium", label: "Premium", icon: Sparkles },
+] as const;
+
 export default function Settings() {
+  const [params, setParams] = useSearchParams();
+  const tab = SETTINGS_TABS.some((t) => t.id === params.get("tab")) ? params.get("tab")! : "personal";
   const settings = useQuery({
     queryKey: ["settings"],
     queryFn: () => apiGet<AppSettings>("/settings"),
@@ -100,9 +112,21 @@ export default function Settings() {
     >
       <div>
         <h1 className="font-heading text-3xl font-bold tracking-tight">Settings</h1>
-        <p className="text-sm text-muted-foreground">Home city, weather units and appearance.</p>
+        <p className="text-sm text-muted-foreground">Everything about you, your alarms, the app and Premium.</p>
       </div>
 
+      <Tabs value={tab} onValueChange={(v) => setParams(v === "personal" ? {} : { tab: String(v) }, { replace: true })} data-testid="settings-tabs">
+        <div className="sticky top-0 z-10 -mx-1 overflow-x-auto bg-background/80 px-1 py-1 backdrop-blur">
+          <TabsList className="w-max">
+            {SETTINGS_TABS.map((t) => (
+              <TabsTrigger key={t.id} value={t.id} className="gap-1.5 px-3" data-testid={`settings-tab-${t.id}`}>
+                <t.icon className="size-4" /> {t.label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </div>
+
+      <TabsContent value="personal" className="space-y-6 pt-4" data-testid="settings-panel-personal">
       <Card>
         <CardHeader>
           <CardTitle className="font-heading">Home location</CardTitle>
@@ -187,7 +211,17 @@ export default function Settings() {
           )}
         </CardContent>
       </Card>
+      <MyBirthdayCard />
+      <CommuteCard />
+      </TabsContent>
 
+      <TabsContent value="alarms" className="space-y-6 pt-4" data-testid="settings-panel-alarms">
+        <OverviewWakeCard />
+        <NotificationsCard />
+        <HolidaySetsCard />
+      </TabsContent>
+
+      <TabsContent value="app" className="space-y-6 pt-4" data-testid="settings-panel-app">
       <Card>
         <CardHeader>
           <CardTitle className="font-heading">Appearance</CardTitle>
@@ -251,17 +285,9 @@ export default function Settings() {
         </CardContent>
       </Card>
 
-      <OverviewWakeCard />
-
-      <CommuteCard />
-
       <VoiceSettingsCard />
       <BirdsongCard />
-      <HolidaySetsCard />
-      <MyBirthdayCard />
       <MealPlanSourceCard />
-
-      <NotificationsCard />
 
       <Card className={cn("border-dashed")}>
         <CardHeader>
@@ -273,6 +299,12 @@ export default function Settings() {
           </CardDescription>
         </CardHeader>
       </Card>
+      </TabsContent>
+
+      <TabsContent value="premium" className="space-y-6 pt-4" data-testid="settings-panel-premium">
+        <PremiumFeaturesCard />
+      </TabsContent>
+      </Tabs>
     </motion.div>
   );
 }

@@ -4,7 +4,9 @@ import { ShareStatsButton } from "@/components/ShareStatsCard";
 import { useMe } from "@/lib/auth";
 import { motion } from "motion/react";
 import { apiGet } from "@/lib/api";
-import type { Stats } from "@/lib/types";
+import type { Stats, WorkHours } from "@/lib/types";
+import { format, parseISO } from "date-fns";
+import { Briefcase } from "lucide-react";
 import { fmtShort } from "@/lib/dates";
 import { Flower, FLOWER_KINDS } from "@/components/Flower";
 import { Lei } from "@/components/Lei";
@@ -19,6 +21,47 @@ function Tile({ id, label, value, sub }: { id: string; label: string; value: str
       <p className="mt-1 font-heading text-3xl font-bold tabular-nums" data-testid={`stat-${id}-value`}>{value}</p>
       {sub && <p className="text-xs text-muted-foreground">{sub}</p>}
     </div>
+  );
+}
+
+const hrs = (h: number) => (Number.isInteger(h) ? `${h}` : h.toFixed(1));
+
+function WorkHoursCard() {
+  const q = useQuery({ queryKey: ["work-hours"], queryFn: () => apiGet<WorkHours>("/stats/work") });
+  const w = q.data;
+  if (!w?.jobs.length) return null;
+  const month = format(parseISO(`${w.month}-01T12:00:00`), "MMMM");
+  const totalW = w.jobs.reduce((n, j) => n + j.weekHours, 0);
+  const totalM = w.jobs.reduce((n, j) => n + j.monthHours, 0);
+  return (
+    <Card data-testid="stats-work-hours-card">
+      <CardHeader className="pb-1">
+        <CardTitle className="flex items-center gap-2 font-heading"><Briefcase className="size-4 text-sky-600" /> Hours on the rota</CardTitle>
+        <p className="text-xs text-muted-foreground">This week ({fmtShort(w.weekStart)} – {fmtShort(w.weekEnd)}) and all of {month}, from your shifts.</p>
+      </CardHeader>
+      <CardContent>
+        <ul className="divide-y">
+          {w.jobs.map((j) => (
+            <li key={j.jobId} className="grid grid-cols-[1fr_auto_auto] items-center gap-4 py-2.5" data-testid={`stats-work-${j.jobId}`}>
+              <span className="truncate text-sm font-medium">{j.name}</span>
+              <span className="text-right">
+                <span className="block font-heading text-xl font-bold" data-testid={`stats-work-week-${j.jobId}`}>{hrs(j.weekHours)}h</span>
+                <span className="block text-[11px] text-muted-foreground">this week · {j.weekShifts} shift{j.weekShifts === 1 ? "" : "s"}</span>
+              </span>
+              <span className="text-right">
+                <span className="block font-heading text-xl font-bold" data-testid={`stats-work-month-${j.jobId}`}>{hrs(j.monthHours)}h</span>
+                <span className="block text-[11px] text-muted-foreground">{month} · {j.monthShifts} shift{j.monthShifts === 1 ? "" : "s"}</span>
+              </span>
+            </li>
+          ))}
+          {w.jobs.length > 1 && (
+            <li className="grid grid-cols-[1fr_auto_auto] gap-4 pt-2.5 text-sm font-semibold" data-testid="stats-work-total">
+              <span>All jobs</span><span className="text-right">{hrs(totalW)}h</span><span className="text-right">{hrs(totalM)}h</span>
+            </li>
+          )}
+        </ul>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -70,6 +113,8 @@ export default function StatsPage() {
           </Card>
         ))}
       </div>
+
+      <WorkHoursCard />
 
       {s && (
         <div className="grid grid-cols-2 gap-3 md:grid-cols-4">

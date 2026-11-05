@@ -9,7 +9,7 @@ PremiumPlan = Literal["monthly", "yearly"]
 
 class PremiumPrice(BaseModel):
     plan: PremiumPlan
-    label: str  # "£2.99 / month"
+    label: str  # "£4.99 / month"
     amount: float
     currency: str = "GBP"
 

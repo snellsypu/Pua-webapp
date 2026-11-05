@@ -180,6 +180,7 @@ def heads_up_line(events: list[UpcomingEvent]) -> str:
     def gifts(e: UpcomingEvent) -> str:
         todo = [g.text for g in (e.custom.gifts if e.custom else e.gifts) if not g.bought]
         todo += [f"{g.text} (you're buying it)" for g in e.pool if g.claimedByMe]
+        todo += [f"{g.text} (you're chipping in £{c.amount:g})" for g in e.pool if not g.claimedByMe for c in g.chipIns if c.mine]
         return f" — gift ideas: {', '.join(todo[:4])}" if todo else ""
     groups = {d: [name(e) + (gifts(e) if d in (7, 1) else "") for e in events if e.daysUntil == d] for d in HEADS_UP}
     month = [name(e) for e in events if is_heads_up(e) and e.daysUntil == MILESTONE_LEAD]
@@ -227,6 +228,12 @@ async def put_my_birthday(input: MyBirthday, request: Request):
 # with that friend — never to the friend. "I'm buying this" claims one so nobody doubles up.
 
 
+class ChipIn(BaseModel):
+    name: str  # first name
+    amount: float
+    mine: bool = False
+
+
 class PoolGift(BaseModel):
     id: str
     text: str
@@ -234,6 +241,12 @@ class PoolGift(BaseModel):
     mine: bool = False
     claimedBy: str | None = None
     claimedByMe: bool = False
+    chipIns: list[ChipIn] = Field(default_factory=list)  # who's putting money towards it, and how much
+    chipTotal: float = 0
+
+
+class ChipInIn(BaseModel):
+    amount: float = Field(gt=0, le=10000)
 
 
 class PoolGiftIn(BaseModel):
@@ -242,9 +255,11 @@ class PoolGiftIn(BaseModel):
 
 def _pool_out(d: dict, me: str) -> PoolGift:
     c = d.get("claimedBy")
+    chips = [ChipIn(name=x["name"].split(" ")[0], amount=x["amount"], mine=x["user_id"] == me) for x in d.get("chipIns", [])]
     return PoolGift(id=d["id"], text=d["text"], addedBy=d["addedBy"]["name"].split(" ")[0],
                     mine=d["addedBy"]["user_id"] == me, claimedBy=c["name"].split(" ")[0] if c else None,
-                    claimedByMe=bool(c and c["user_id"] == me))
+                    claimedByMe=bool(c and c["user_id"] == me), chipIns=chips,
+                    chipTotal=round(sum(x.amount for x in chips), 2))
 
 
 async def _common(friend_id: str, me: str) -> list[str]:
@@ -297,6 +312,25 @@ async def claim_pool_gift(friend_id: str, gift_id: str, request: Request):
     new = None if c else {"user_id": me["user_id"], "name": me.get("name", "Friend")}
     await raw_db.gift_pool.update_one({"id": gift_id}, {"$set": {"claimedBy": new}})
     return await _pool(friend_id, me["user_id"])
+
+
+@router.put("/friends/{friend_id}/pool/{gift_id}/chip-in", response_model=list[PoolGift])
+async def chip_in(friend_id: str, gift_id: str, input: ChipInIn, request: Request):
+    """Join in on a pool gift (or change how much you're putting in)."""
+    me = request.state.user
+    await _pool_doc(friend_id, gift_id, me["user_id"])
+    await raw_db.gift_pool.update_one({"id": gift_id}, {"$pull": {"chipIns": {"user_id": me["user_id"]}}})
+    await raw_db.gift_pool.update_one({"id": gift_id}, {"$push": {"chipIns": {
+        "user_id": me["user_id"], "name": me.get("name", "Friend"), "amount": round(input.amount, 2)}}})
+    return await _pool(friend_id, me["user_id"])
+
+
+@router.delete("/friends/{friend_id}/pool/{gift_id}/chip-in", response_model=list[PoolGift])
+async def leave_chip_in(friend_id: str, gift_id: str, request: Request):
+    me = request.state.user["user_id"]
+    await _pool_doc(friend_id, gift_id, me)
+    await raw_db.gift_pool.update_one({"id": gift_id}, {"$pull": {"chipIns": {"user_id": me}}})
+    return await _pool(friend_id, me)
 
 
 @router.delete("/friends/{friend_id}/pool/{gift_id}", response_model=list[PoolGift])

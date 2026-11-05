@@ -30,6 +30,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { AttendeeManager } from "@/components/AppointmentJoin";
+import { ShiftClashNote } from "@/components/WorkRota";
 
 export interface AppointmentDraft {
   id?: string;
@@ -198,6 +199,7 @@ export function AppointmentDialog({
               />
             </div>
           </div>
+          {!initial?.joinedFrom && <ShiftClashNote date={form.date} start={form.startTime} end={form.endTime} />}
           <div className="grid gap-1.5">
             <Label htmlFor="appt-location">Location</Label>
             <div className="flex gap-2">

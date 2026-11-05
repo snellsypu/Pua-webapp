@@ -44,6 +44,54 @@ export function MilestoneBadge({ e, className }: { e: UpcomingEvent; className?:
   );
 }
 
+const gbp = (n: number) => `£${Number.isInteger(n) ? n : n.toFixed(2)}`;
+
+/** Chip-in line under a pool gift: who's in and how much, plus join / change / leave. */
+function ChipInRow({ g, base, onDone }: { g: PoolGift; base: string; onDone: (p: PoolGift[]) => void }) {
+  const mine = g.chipIns.find((c) => c.mine);
+  const [editing, setEditing] = useState(false);
+  const [amount, setAmount] = useState("");
+  const save = useMutation({
+    mutationFn: (a: number) => apiPut<PoolGift[]>(`${base}/${g.id}/chip-in`, { amount: a }),
+    onSuccess: (p, a) => { onDone(p); setEditing(false); toast.success(`You're chipping in ${gbp(a)} 💐`); },
+    onError: () => toast.error("Couldn't save your chip-in"),
+  });
+  const leave = useMutation({
+    mutationFn: () => apiDelete<PoolGift[]>(`${base}/${g.id}/chip-in`),
+    onSuccess: (p) => { onDone(p); toast.success("You're out of this one"); },
+    onError: () => toast.error("Couldn't update your chip-in"),
+  });
+  const value = Number(amount);
+  return (
+    <div className="mt-1 space-y-1" data-testid={`gift-pool-chip-${g.id}`}>
+      {!!g.chipIns.length && (
+        <p className="text-[11px] text-emerald-800 dark:text-emerald-300" data-testid={`gift-pool-chip-list-${g.id}`}>
+          🤝 {g.chipIns.map((c) => `${c.mine ? "You" : c.name} ${gbp(c.amount)}`).join(" · ")} — <span className="font-semibold">{gbp(g.chipTotal)} together</span>
+        </p>
+      )}
+      {editing ? (
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs text-muted-foreground">£</span>
+          <Input inputMode="decimal" autoFocus value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^\d.]/g, "").slice(0, 7))}
+            onKeyDown={(e) => { if (e.key === "Enter" && value > 0) save.mutate(value); }}
+            placeholder="10" className="h-7 w-20 text-xs" aria-label="Amount in pounds" data-testid={`gift-pool-chip-amount-${g.id}`} />
+          <Button size="xs" disabled={!(value > 0) || save.isPending} onClick={() => save.mutate(value)} data-testid={`gift-pool-chip-save-${g.id}`}>Save</Button>
+          <Button size="xs" variant="ghost" onClick={() => setEditing(false)} data-testid={`gift-pool-chip-cancel-${g.id}`}>Cancel</Button>
+        </div>
+      ) : (
+        <div className="flex items-center gap-1.5">
+          <Button size="xs" variant="outline" onClick={() => { setAmount(mine ? String(mine.amount) : ""); setEditing(true); }} data-testid={`gift-pool-chip-button-${g.id}`}>
+            🤝 {mine ? "Change amount" : "Chip in"}
+          </Button>
+          {mine && (
+            <Button size="xs" variant="ghost" disabled={leave.isPending} onClick={() => leave.mutate()} data-testid={`gift-pool-chip-leave-${g.id}`}>Leave</Button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /** Your private gift list for a bouquet friend's shared birthday (saved as you go). */
 function FriendGiftDialog({ e, onClose }: { e: UpcomingEvent | null; onClose: () => void }) {
   const qc = useQueryClient();
@@ -84,10 +132,10 @@ function FriendGiftDialog({ e, onClose }: { e: UpcomingEvent | null; onClose: ()
   const add = () => { const t = text.trim(); if (t) { change([...gifts, { id: crypto.randomUUID(), text: t, bought: false }]); setText(""); } };
   return (
     <Dialog open={!!e} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-md" data-testid="friend-gift-dialog">
+      <DialogContent className="max-h-[90dvh] overflow-x-hidden overflow-y-auto sm:max-w-md [&>*]:min-w-0" data-testid="friend-gift-dialog">
         <DialogHeader>
           <DialogTitle className="font-heading">🎈 {e ? eventLabel(e) : ""}</DialogTitle>
-          <DialogDescription>{e ? `${fmtShort(e.next)}${e.years ? ` · turns ${e.years}` : ""}` : ""} — only you can see this gift list.</DialogDescription>
+          <DialogDescription className="min-w-0 break-words">{e ? `${fmtShort(e.next)}${e.years ? ` · turns ${e.years}` : ""}` : ""} — only you can see this gift list.</DialogDescription>
         </DialogHeader>
         <ul className="grid gap-1.5" data-testid="friend-gift-list">
           {gifts.map((g, i) => (
@@ -108,21 +156,22 @@ function FriendGiftDialog({ e, onClose }: { e: UpcomingEvent | null; onClose: ()
           {!gifts.length && <li className="text-sm text-muted-foreground">No gift ideas yet.</li>}
         </ul>
         <div className="flex gap-2">
-          <Input value={text} onChange={(ev) => setText(ev.target.value)} maxLength={80} placeholder="e.g. Silk scarf" className="h-8 text-sm"
+          <Input value={text} onChange={(ev) => setText(ev.target.value)} maxLength={80} placeholder="e.g. Silk scarf" className="h-8 min-w-0 flex-1 text-sm"
             onKeyDown={(ev) => { if (ev.key === "Enter") { ev.preventDefault(); add(); } }} data-testid="friend-gift-input" />
           <Button type="button" size="sm" variant="outline" className="h-8" onClick={add} disabled={!text.trim()} data-testid="friend-gift-add"><Plus className="size-3.5" /> Add</Button>
         </div>
         <div className="space-y-2 rounded-2xl border border-pink-400/40 bg-pink-500/5 p-3" data-testid="gift-pool">
           <div>
             <p className="text-sm font-semibold">💐 Bouquet gift pool</p>
-            <p className="text-xs text-muted-foreground">Everyone in your bouquets with {e?.title} sees these — {e?.title} never does. Claim one so nobody doubles up.</p>
+            <p className="text-xs text-muted-foreground">Everyone in your bouquets with {e?.title} sees these — {e?.title} never does. Claim one so nobody doubles up, or chip in together.</p>
           </div>
           <ul className="grid gap-1.5" data-testid="gift-pool-list">
             {pool.map((g) => (
-              <li key={g.id} className="flex items-center gap-2 text-sm" data-testid={`gift-pool-item-${g.id}`}>
+              <li key={g.id} className="flex items-start gap-2 border-b border-pink-400/20 pb-2 text-sm last:border-0 last:pb-0" data-testid={`gift-pool-item-${g.id}`}>
                 <span className="min-w-0 flex-1">
                   <span className={cn("block truncate", g.claimedBy && !g.claimedByMe && "text-muted-foreground")}>{g.text}</span>
                   <span className="block text-[11px] text-muted-foreground">{g.mine ? "your idea" : `${g.addedBy}'s idea`}</span>
+                  <ChipInRow g={g} base={poolBase} onDone={poolDone} />
                 </span>
                 {g.claimedBy && !g.claimedByMe ? (
                   <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium" data-testid={`gift-pool-claimed-${g.id}`}>🛍️ {g.claimedBy} is buying</span>
@@ -140,7 +189,7 @@ function FriendGiftDialog({ e, onClose }: { e: UpcomingEvent | null; onClose: ()
             {!pool.length && <li className="text-xs text-muted-foreground">No shared ideas yet.</li>}
           </ul>
           <div className="flex gap-2">
-            <Input value={poolText} onChange={(ev) => setPoolText(ev.target.value)} maxLength={80} placeholder="Suggest a gift for everyone…" className="h-8 text-sm"
+            <Input value={poolText} onChange={(ev) => setPoolText(ev.target.value)} maxLength={80} placeholder="Suggest a gift for everyone…" className="h-8 min-w-0 flex-1 text-sm"
               onKeyDown={(ev) => { if (ev.key === "Enter" && poolText.trim()) { ev.preventDefault(); poolAdd.mutate(poolText.trim()); } }} data-testid="gift-pool-input" />
             <Button type="button" size="sm" variant="outline" className="h-8" disabled={!poolText.trim() || poolAdd.isPending} onClick={() => poolAdd.mutate(poolText.trim())} data-testid="gift-pool-add">
               <Plus className="size-3.5" /> Share
@@ -241,7 +290,7 @@ function EventDialog({ open, onOpenChange, initial }: { open: boolean; onOpenCha
                 </ul>
               )}
               <div className="flex gap-1.5">
-                <Input value={gift} onChange={(e) => setGift(e.target.value)} maxLength={80} placeholder="e.g. Silk scarf" className="h-8 text-sm"
+                <Input value={gift} onChange={(e) => setGift(e.target.value)} maxLength={80} placeholder="e.g. Silk scarf" className="h-8 min-w-0 flex-1 text-sm"
                   onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addGift(); } }} data-testid="anniversary-gift-input" />
                 <Button type="button" size="sm" variant="outline" className="h-8" onClick={addGift} disabled={!gift.trim()} data-testid="anniversary-gift-add"><Plus className="size-3.5" /> Add</Button>
               </div>
@@ -275,7 +324,7 @@ export default function Anniversaries() {
           <p className="text-muted-foreground">Birthdays, anniversaries and holidays — with a heads-up in your morning briefing a week and a day before.</p>
         </div>
         <div className="flex gap-2">
-          <Link to="/settings#holidays" className="inline-flex h-9 items-center gap-1.5 rounded-lg border px-3 text-sm transition-colors duration-150 hover:bg-accent" data-testid="anniversaries-holiday-settings">
+          <Link to="/settings?tab=alarms#holidays" className="inline-flex h-9 items-center gap-1.5 rounded-lg border px-3 text-sm transition-colors duration-150 hover:bg-accent" data-testid="anniversaries-holiday-settings">
             <Settings2 className="size-4" /> Holidays
           </Link>
           <Button onClick={() => open(null)} data-testid="anniversary-add"><Plus className="size-4" /> Add</Button>

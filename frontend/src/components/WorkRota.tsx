@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import { addDaysIso } from "@/lib/dates";
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const FREE_JOBS = 1;
@@ -66,7 +67,7 @@ function JobEditor({ job, today, onDone }: { job: Job | null; today: string; onD
       return job ? apiPut<Job>(`/jobs/${job.id}`, body) : apiPost<Job>("/jobs", body);
     },
     onSuccess: () => {
-      for (const k of ["jobs", "range", "overview", "friends-calendar"]) qc.invalidateQueries({ queryKey: [k] });
+      for (const k of ["jobs", "range", "overview", "friends-calendar", "work-blocks", "work-hours"]) qc.invalidateQueries({ queryKey: [k] });
       toast.success(job ? "Rota updated" : "Job added — your shifts are on the calendar");
       onDone();
     },
@@ -147,7 +148,7 @@ export function WorkRotaDialog({ open, onOpenChange, today }: { open: boolean; o
   useEffect(() => { if (!open) setEditing(null); }, [open]);
   const del = useMutation({
     mutationFn: (id: string) => apiDelete(`/jobs/${id}`),
-    onSuccess: () => { for (const k of ["jobs", "range", "overview", "friends-calendar"]) qc.invalidateQueries({ queryKey: [k] }); toast.success("Job removed"); },
+    onSuccess: () => { for (const k of ["jobs", "range", "overview", "friends-calendar", "work-blocks", "work-hours"]) qc.invalidateQueries({ queryKey: [k] }); toast.success("Job removed"); },
     onError: () => toast.error("Couldn't remove the job"),
   });
   const list = jobs.data ?? [];
@@ -184,5 +185,38 @@ export function WorkRotaDialog({ open, onOpenChange, today }: { open: boolean; o
         )}
       </DialogContent>
     </Dialog>
+  );
+}
+
+const mins = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
+
+/** Shifts that overlap an appointment on `date` (incl. last night's overnight shift running into it). */
+export function useShiftClash(date: string, start: string, end: string | null | undefined) {
+  const prev = date ? addDaysIso(date, -1) : "";
+  const q = useQuery({
+    queryKey: ["work-blocks", date],
+    queryFn: () => apiGet<WorkBlock[]>(`/jobs/blocks?from=${prev}&to=${date}`),
+    enabled: /^\d{4}-\d{2}-\d{2}$/.test(date) && !!start,
+    staleTime: 60_000,
+  });
+  if (!q.data || !start) return [];
+  const a0 = mins(start);
+  const a1 = end && mins(end) > a0 ? mins(end) : a0 + 60; // no end → assume an hour
+  return q.data.filter((b) => {
+    const s = mins(b.startTime);
+    const e = mins(b.endTime) + (b.overnight ? 1440 : 0);
+    const [b0, b1] = b.date === date ? [s, e] : b.overnight ? [s - 1440, e - 1440] : [0, 0];
+    return b0 < a1 && a0 < b1;
+  });
+}
+
+export function ShiftClashNote({ date, start, end }: { date: string; start: string; end?: string | null }) {
+  const clashes = useShiftClash(date, start, end);
+  if (!clashes.length) return null;
+  return (
+    <p className="flex items-start gap-2 rounded-xl border border-amber-500/40 bg-amber-400/10 px-3 py-2 text-xs text-amber-900 animate-in fade-in slide-in-from-top-1 dark:text-amber-200" data-testid="appointment-shift-clash">
+      <Briefcase className="mt-0.5 size-3.5 shrink-0" />
+      <span>Heads up — this overlaps your {clashes.map((b) => `${b.name} shift (${b.startTime}–${b.endTime})`).join(" and ")}. You can still save it.</span>
+    </p>
   );
 }

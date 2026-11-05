@@ -461,3 +461,18 @@ Gift ideas have a 🛒 button in the event dialog → POST /api/shopping.
   DayContext/RangeBundle.workBlocks, FriendCalendar.workBlocks and SharedPlanner.workBlocks (when the
   person shares appointments) → shown as striped "Working · Job" blocks (DayAgenda, calendar cells 💼,
   "Friends working" in the day sheet). Calendar header "Work rota" opens the editor.
+
+## Premium price, settings tabs, rota hours, clash warning, chip-in
+- Premium is £4.99/month and £50/year (Stripe lookup keys pua_premium_monthly/yearly; setup_stripe.py
+  CATALOG + routers/premium.py PRICES). "Save N%" is computed from live prices (yearlySaving).
+- Settings has tabs (?tab=personal|alarms|app|premium): Personal info (home location, birthday,
+  commute), Alarms & reminders (overview/wake, notifications, holidays), App settings (appearance,
+  voice, jungle sounds, meal-plan source, widget), Premium (PremiumFeaturesCard: perks, prices,
+  Get Premium → checkout, or plan/renewal + Cancel).
+- GET /api/stats/work → this week (Mon–Sun) and this calendar month scheduled hours + shift counts per
+  job (overnight shifts wrap) → "Hours on the rota" card on Stats.
+- Appointment dialog: ShiftClashNote warns (doesn't block) when the time overlaps a shift, incl. last
+  night's overnight shift (GET /api/jobs/blocks?from=date-1&to=date).
+- Gift pool chip-in: gift_pool.chipIns [{user_id, name, amount}]; PUT /…/pool/{gid}/chip-in {amount>0}
+  (sets/changes), DELETE same (leave). PoolGift.chipIns/chipTotal; heads-up adds
+  "X (you're chipping in £N)".

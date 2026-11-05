@@ -682,6 +682,13 @@ export interface PoolGift {
   mine: boolean;
   claimedBy: string | null; // first name of whoever's buying it
   claimedByMe: boolean;
+  chipIns: ChipIn[]; // who's putting money towards it, and how much
+  chipTotal: number;
+}
+export interface ChipIn {
+  name: string; // first name
+  amount: number;
+  mine: boolean;
 }
 
 // ---- work rota (backend/models/jobs.py)
@@ -708,4 +715,20 @@ export interface WorkBlock {
   startTime: string;
   endTime: string;
   overnight: boolean;
+}
+
+// ---- work hours (GET /api/stats/work)
+export interface JobHours {
+  jobId: string;
+  name: string;
+  weekHours: number;
+  weekShifts: number;
+  monthHours: number;
+  monthShifts: number;
+}
+export interface WorkHours {
+  weekStart: string;
+  weekEnd: string;
+  month: string; // YYYY-MM
+  jobs: JobHours[];
 }

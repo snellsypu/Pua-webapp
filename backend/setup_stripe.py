@@ -12,8 +12,8 @@ CATALOG = [{
     "name": "PUA Premium",
     "tax_code": "txcd_10103001",  # SaaS
     "prices": [
-        {"lookup_key": "pua_premium_monthly", "amount": 299, "currency": "gbp", "interval": "month"},
-        {"lookup_key": "pua_premium_yearly", "amount": 2499, "currency": "gbp", "interval": "year"},
+        {"lookup_key": "pua_premium_monthly", "amount": 499, "currency": "gbp", "interval": "month"},
+        {"lookup_key": "pua_premium_yearly", "amount": 5000, "currency": "gbp", "interval": "year"},
     ],
 }]
 

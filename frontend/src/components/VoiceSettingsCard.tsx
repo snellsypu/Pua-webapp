@@ -87,7 +87,7 @@ export function VoiceSettingsCard() {
             <span className="text-xs font-medium text-primary" data-testid="settings-premium-status">
               {premium.data?.active
                 ? `${premium.data.plan === "yearly" ? "Yearly" : "Monthly"} plan · renews ${premium.data.renewsOn ?? ""} · untick to cancel.`
-                : "Tick to see plans — from £2.99 / month."}
+                : `Tick to see plans — from ${premium.data?.prices.find((p) => p.plan === "monthly")?.label ?? "£4.99 / month"}.`}
             </span>
           </span>
         </label>
