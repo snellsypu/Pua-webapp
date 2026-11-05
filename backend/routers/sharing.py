@@ -16,6 +16,7 @@ from fastapi import APIRouter, HTTPException, Query, Request
 
 from lib.auth import new_friend_code
 from lib.dates import today_iso
+from lib.work import blocks_of
 from lib.db import current_owner, raw_db
 from models.auth import (
     Leaderboard, LeaderboardEntry,
@@ -137,7 +138,7 @@ async def _state(uid: str) -> SharingState:
     async for b in raw_db.bouquets.find({"id": {"$in": list(my_memberships)}}).sort("createdAt", 1):
         m = my_memberships[b["id"]]
         memberships.append(Membership(
-            bouquetId=b["id"], bouquetName=b["name"], ownerName=owners.get(b["ownerId"], {}).get("name", ""),
+            bouquetId=b["id"], bouquetName=b["name"], ownerId=b["ownerId"], ownerName=owners.get(b["ownerId"], {}).get("name", ""),
             categories=m.get("categories", []), shoppingEdit=m.get("shoppingEdit", True),
             paused=b["id"] in await paused_ids(b["ownerId"])))
     return SharingState(bouquets=bouquets, joined=joined, memberships=memberships)
@@ -273,6 +274,7 @@ async def join(input: JoinIn, request: Request):
     )
     out = await _state(uid)
     out.joinedOwnerId = b["ownerId"]
+    out.joinedBouquetId = b["id"]
     return out
 
 
@@ -350,6 +352,7 @@ async def shared_planner(owner_id: str, request: Request):
             routines=await routines.list_routines() if "routines" in cats else None,
             meals=await meals.list_meals(from_=today, to=(date.fromisoformat(today) + timedelta(days=6)).isoformat()) if "meals" in cats else None,
             shopping=await shopping.list_items() if "shopping" in cats else None,
+            workBlocks=await blocks_of(owner_id, today, until) if "appointments" in cats else None,
         )
     finally:
         current_owner.reset(token)
@@ -377,6 +380,7 @@ async def friends_calendar(request: Request, from_: str = Query(alias="from"), t
         finally:
             current_owner.reset(token)
         out.append(FriendCalendar(owner=_person(owner), appointments=[_mask(a) for a in appts],
+                                  workBlocks=await blocks_of(owner["user_id"], from_, to),
                                   bouquetId=bqs[0]["id"] if bqs else None, color=colors.get(owner["user_id"])))
     return out
 

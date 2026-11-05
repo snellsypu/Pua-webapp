@@ -559,6 +559,7 @@ class DayContext(BaseModel):
     appointments: list[Appointment]
     meals: list[Meal]
     reminders: list[Reminder]
+    workBlocks: list["WorkBlock"] = Field(default_factory=list)
 
 
 class RangeBundle(BaseModel):
@@ -570,3 +571,10 @@ class RangeBundle(BaseModel):
     meals: list[Meal]
     reminders: list[Reminder]
     completions: list[HabitCompletion]
+    workBlocks: list["WorkBlock"] = Field(default_factory=list)
+
+
+from models.jobs import WorkBlock  # noqa: E402
+
+DayContext.model_rebuild()
+RangeBundle.model_rebuild()

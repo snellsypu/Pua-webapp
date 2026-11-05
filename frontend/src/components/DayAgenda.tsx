@@ -2,28 +2,33 @@ import { GoingLine } from "@/components/AppointmentJoin";
 import { Lock, MapPin, MessageCircle, Pencil, Trash2 } from "lucide-react";
 import { useNoteCounts } from "@/components/BouquetNotes";
 import { Button } from "@/components/ui/button";
-import type { Appointment } from "@/lib/types";
+import type { Appointment, WorkBlock } from "@/lib/types";
+import { WorkBlockList } from "@/components/WorkRota";
 
 export function DayAgenda({
   appointments,
+  workBlocks = [],
   onEdit,
   onDelete,
   emptyLabel = "Nothing scheduled",
 }: {
   appointments: Appointment[];
+  workBlocks?: WorkBlock[];
   onEdit?: (a: Appointment) => void;
   onDelete?: (a: Appointment) => void;
   emptyLabel?: string;
 }) {
   const counts = useNoteCounts();
   if (!appointments.length) {
-    return (
+    return workBlocks.length ? <WorkBlockList blocks={workBlocks} /> : (
       <p className="text-sm text-muted-foreground" data-testid="agenda-empty">
         {emptyLabel}
       </p>
     );
   }
   return (
+    <>
+    <WorkBlockList blocks={workBlocks} />
     <ul className="space-y-2">
       {appointments.map((a) => (
         <li
@@ -87,5 +92,6 @@ export function DayAgenda({
         </li>
       ))}
     </ul>
+    </>
   );
 }

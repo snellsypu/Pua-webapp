@@ -6,7 +6,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { CalendarHeart } from "lucide-react";
 import { apiGet, apiPut } from "@/lib/api";
-import type { HolidaySetState, MyBirthday, UpcomingEvent } from "@/lib/types";
+import type { HolidaySetState, MyBirthday, SharingState, UpcomingEvent } from "@/lib/types";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -14,21 +15,68 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
-/** Settings: your own birthday, optionally shared with everyone in your bouquets. */
-export function MyBirthdayCard() {
+const EMPTY_BDAY: MyBirthday = { date: null, year: null, share: false, declined: false };
+
+function useMyBirthday() {
   const qc = useQueryClient();
   const q = useQuery({ queryKey: ["my-birthday"], queryFn: () => apiGet<MyBirthday>("/anniversaries/my-birthday") });
   const save = useMutation({
     mutationFn: (patch: Partial<MyBirthday>) => {
-      const latest = qc.getQueryData<MyBirthday>(["my-birthday"]) ?? { date: null, year: null, share: false };
-      const next = { ...latest, ...patch };
+      const latest = qc.getQueryData<MyBirthday>(["my-birthday"]) ?? EMPTY_BDAY;
+      const next = { ...latest, ...patch, ...(patch.share ? { declined: false } : {}) };
       qc.setQueryData(["my-birthday"], next); // optimistic, so the next edit builds on this one
       return apiPut<MyBirthday>("/anniversaries/my-birthday", next);
     },
-    onSuccess: (b) => { qc.setQueryData(["my-birthday"], b); toast.success(b.share && b.date ? "Birthday saved — your bouquets will see it" : "Birthday saved"); },
+    onSuccess: (b, patch) => {
+      qc.setQueryData(["my-birthday"], b);
+      toast.success(patch.declined ? "Okay — we won't ask again. You can share any time in Settings" : b.share && b.date ? "Birthday saved — your bouquets will see it" : "Birthday saved");
+    },
     onError: () => toast.error("Couldn't save your birthday"),
   });
-  const b = q.data ?? { date: null, year: null, share: false };
+  return { q, b: q.data ?? EMPTY_BDAY, save };
+}
+
+/** Nudge for bouquet members who haven't shared their birthday (until they share or say no). */
+export function BirthdayNudgeCard() {
+  const { q, b, save } = useMyBirthday();
+  const sharing = useQuery({ queryKey: ["sharing"], queryFn: () => apiGet<SharingState>("/sharing") });
+  const [m, setM] = useState(0);
+  const [d, setD] = useState(0);
+  if (!q.data || !sharing.data?.joined.length || (b.date && b.share) || b.declined) return null;
+  const pickedDate = b.date ?? (m && d ? `${String(m).padStart(2, "0")}-${String(Math.min(d, new Date(2024, m, 0).getDate())).padStart(2, "0")}` : null);
+  return (
+    <Card className="border-pink-400/50 bg-gradient-to-br from-pink-500/10 to-amber-400/10" data-testid="birthday-nudge-card">
+      <CardHeader>
+        <CardTitle className="font-heading">Share your birthday with your bouquets? 🎈</CardTitle>
+        <CardDescription>Your friends can only remember it if they can see it — it shows in their Anniversaries with a heads-up a week before.</CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-wrap items-center gap-2">
+        {!b.date && (
+          <>
+            <Select value={d ? String(d) : ""} onValueChange={(v) => setD(Number(v))}>
+              <SelectTrigger className="w-20" data-testid="birthday-nudge-day" aria-label="Day"><SelectValue placeholder="Day">{d || "Day"}</SelectValue></SelectTrigger>
+              <SelectContent>{Array.from({ length: 31 }, (_, i) => <SelectItem key={i} value={String(i + 1)}>{i + 1}</SelectItem>)}</SelectContent>
+            </Select>
+            <Select value={m ? String(m) : ""} onValueChange={(v) => setM(Number(v))}>
+              <SelectTrigger className="w-24" data-testid="birthday-nudge-month" aria-label="Month"><SelectValue placeholder="Month">{m ? MONTHS[m - 1] : "Month"}</SelectValue></SelectTrigger>
+              <SelectContent>{MONTHS.map((x, i) => <SelectItem key={x} value={String(i + 1)}>{x}</SelectItem>)}</SelectContent>
+            </Select>
+          </>
+        )}
+        <Button size="sm" disabled={!pickedDate || save.isPending} onClick={() => save.mutate({ date: pickedDate, share: true })} data-testid="birthday-nudge-share">
+          🎂 {b.date ? "Share my birthday" : "Share it"}
+        </Button>
+        <Button size="sm" variant="ghost" disabled={save.isPending} onClick={() => save.mutate({ declined: true })} data-testid="birthday-nudge-decline">
+          Don&apos;t want to share
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
+
+/** Settings: your own birthday, optionally shared with everyone in your bouquets. */
+export function MyBirthdayCard() {
+  const { b, save } = useMyBirthday();
   const [yearText, setYearText] = useState<string | null>(null);
   const shownYear = yearText ?? (b.year ? String(b.year) : "");
   const [m, d] = b.date ? b.date.split("-").map(Number) : [0, 0];

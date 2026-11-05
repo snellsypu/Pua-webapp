@@ -3,6 +3,8 @@
 it reads the date back from these responses."""
 
 import asyncio
+
+from lib.work import my_blocks
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
@@ -63,7 +65,8 @@ async def get_overview(offset: int = Query(default=0, ge=-31, le=366)):
     appointments, meals, reminders = await asyncio.gather(
         _appointments(target, target), _meals(target, target), _reminders(target, target)
     )
-    return DayContext(date=target, appointments=appointments, meals=meals, reminders=reminders)
+    return DayContext(date=target, appointments=appointments, meals=meals, reminders=reminders,
+                      workBlocks=await my_blocks(target, target))
 
 
 @router.get("/daypart", response_model=DayPart)
@@ -112,4 +115,5 @@ async def get_range(
         meals=meals,
         reminders=reminders,
         completions=completions,
+        workBlocks=await my_blocks(from_, to),
     )

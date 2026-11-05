@@ -26,6 +26,7 @@ from routers import premium as premium_routes
 from routers import stats as stats_routes
 from routers import strava as strava_routes
 from routers import anniversaries as anniversaries_routes
+from routers import jobs as jobs_routes
 from routers import appointments, commute, runplan, habits, health, meals, overview, push, reminders, routines, shopping, voice
 from routers import settings as settings_routes
 from routers import weather as weather_routes
@@ -99,6 +100,7 @@ api_router.include_router(push.router)
 api_router.include_router(voice.router)
 api_router.include_router(commute.router)
 api_router.include_router(runplan.router)
+api_router.include_router(jobs_routes.router)
 
 # Include the router in the main app
 app.include_router(api_router)

@@ -61,6 +61,7 @@ class UpcomingEvent(BaseModel):
     friend: str | None = None  # user_id when it's a bouquet friend's shared birthday
     milestone: str | None = None  # e.g. "18th", "Big 40", "Silver" — decades + English milestones
     gifts: list[GiftIdea] = Field(default_factory=list)  # your private gift ideas for a friend's birthday
+    pool: list["PoolGift"] = Field(default_factory=list)  # the bouquet's shared ideas (never shown to the friend)
 
 
 class HolidaySetState(BaseModel):
@@ -74,6 +75,7 @@ class MyBirthday(BaseModel):
     date: str | None = None  # MM-DD; null = not set
     year: int | None = Field(default=None, ge=1900, le=2100)  # birth year → bouquet sees your age
     share: bool = False  # bouquet friends see it in their Anniversaries
+    declined: bool = False  # "Don't want to share" — stops the bouquet birthday nudge
 
     @field_validator("date")
     @classmethod
@@ -147,14 +149,16 @@ async def upcoming(days: int = 366) -> list[UpcomingEvent]:
     today = date.fromisoformat(today_iso())
     out: list[UpcomingEvent] = []
     friend_gifts = {g["friendId"]: g.get("gifts", []) async for g in db.friend_gifts.find({}, {"_id": 0})}
-    for u in await _friend_birthdays(current_owner.get()):
+    me = current_owner.get()
+    for u in await _friend_birthdays(me):
         nxt = _next(u["birthday"]["date"], today)
         by = u["birthday"].get("year")
         yrs = nxt.year - by if by else None
         out.append(UpcomingEvent(
             id=f"friend:{u['user_id']}", title=u.get("name", "Friend").split(" ")[0], emoji="🎈", kind="birthday",
             next=nxt.isoformat(), daysUntil=(nxt - today).days, years=yrs, milestone=milestone("birthday", yrs),
-            friend=u["user_id"], gifts=[GiftIdea(**g) for g in friend_gifts.get(u["user_id"], [])]))
+            friend=u["user_id"], gifts=[GiftIdea(**g) for g in friend_gifts.get(u["user_id"], [])],
+            pool=await _pool(u["user_id"], me)))
     async for a in db.anniversaries.find({}, {"_id": 0}):
         ann = Anniversary(**a)
         nxt = _next(ann.date, today)
@@ -175,6 +179,7 @@ def heads_up_line(events: list[UpcomingEvent]) -> str:
     name = spoken_name
     def gifts(e: UpcomingEvent) -> str:
         todo = [g.text for g in (e.custom.gifts if e.custom else e.gifts) if not g.bought]
+        todo += [f"{g.text} (you're buying it)" for g in e.pool if g.claimedByMe]
         return f" — gift ideas: {', '.join(todo[:4])}" if todo else ""
     groups = {d: [name(e) + (gifts(e) if d in (7, 1) else "") for e in events if e.daysUntil == d] for d in HEADS_UP}
     month = [name(e) for e in events if is_heads_up(e) and e.daysUntil == MILESTONE_LEAD]
@@ -215,6 +220,93 @@ async def get_my_birthday(request: Request):
 async def put_my_birthday(input: MyBirthday, request: Request):
     await raw_db.users.update_one({"user_id": request.state.user["user_id"]}, {"$set": {"birthday": input.model_dump()}})
     return input
+
+
+# ---------------------------------------------------------------- bouquet gift pool
+# Shared ideas for a friend's birthday, visible to everyone in the bouquets the adder shares
+# with that friend — never to the friend. "I'm buying this" claims one so nobody doubles up.
+
+
+class PoolGift(BaseModel):
+    id: str
+    text: str
+    addedBy: str
+    mine: bool = False
+    claimedBy: str | None = None
+    claimedByMe: bool = False
+
+
+class PoolGiftIn(BaseModel):
+    text: str = Field(min_length=1, max_length=80)
+
+
+def _pool_out(d: dict, me: str) -> PoolGift:
+    c = d.get("claimedBy")
+    return PoolGift(id=d["id"], text=d["text"], addedBy=d["addedBy"]["name"].split(" ")[0],
+                    mine=d["addedBy"]["user_id"] == me, claimedBy=c["name"].split(" ")[0] if c else None,
+                    claimedByMe=bool(c and c["user_id"] == me))
+
+
+async def _common(friend_id: str, me: str) -> list[str]:
+    from routers.sharing import shared_bouquets
+
+    return [b["id"] for b, _, _ in await shared_bouquets(friend_id, me)]
+
+
+async def _pool(friend_id: str, me: str) -> list[PoolGift]:
+    if friend_id == me:
+        return []
+    ids = await _common(friend_id, me)
+    docs = await raw_db.gift_pool.find({"friendId": friend_id, "bouquetIds": {"$in": ids}}, {"_id": 0}).sort("createdAt", 1).to_list(100)
+    return [_pool_out(d, me) for d in docs]
+
+
+async def _pool_doc(friend_id: str, gift_id: str, me: str) -> dict:
+    ids = await _common(friend_id, me) if friend_id != me else []
+    doc = await raw_db.gift_pool.find_one({"id": gift_id, "friendId": friend_id, "bouquetIds": {"$in": ids}}, {"_id": 0})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Gift idea not found")
+    return doc
+
+
+@router.get("/friends/{friend_id}/pool", response_model=list[PoolGift])
+async def get_pool(friend_id: str, request: Request):
+    return await _pool(friend_id, request.state.user["user_id"])
+
+
+@router.post("/friends/{friend_id}/pool", response_model=list[PoolGift], status_code=201)
+async def add_pool_gift(friend_id: str, input: PoolGiftIn, request: Request):
+    me = request.state.user
+    if friend_id not in {u["user_id"] for u in await _friend_birthdays(me["user_id"])}:
+        raise HTTPException(status_code=404, detail="That friend's birthday isn't shared with you")
+    await raw_db.gift_pool.insert_one({
+        "id": str(uuid.uuid4()), "friendId": friend_id, "bouquetIds": await _common(friend_id, me["user_id"]),
+        "text": input.text.strip(), "addedBy": {"user_id": me["user_id"], "name": me.get("name", "Friend")},
+        "claimedBy": None, "createdAt": datetime.now(timezone.utc)})
+    return await _pool(friend_id, me["user_id"])
+
+
+@router.post("/friends/{friend_id}/pool/{gift_id}/claim", response_model=list[PoolGift])
+async def claim_pool_gift(friend_id: str, gift_id: str, request: Request):
+    """I'm buying this (or un-claim if it's yours)."""
+    me = request.state.user
+    doc = await _pool_doc(friend_id, gift_id, me["user_id"])
+    c = doc.get("claimedBy")
+    if c and c["user_id"] != me["user_id"]:
+        raise HTTPException(status_code=409, detail=f"{c['name'].split(' ')[0]} is already buying this")
+    new = None if c else {"user_id": me["user_id"], "name": me.get("name", "Friend")}
+    await raw_db.gift_pool.update_one({"id": gift_id}, {"$set": {"claimedBy": new}})
+    return await _pool(friend_id, me["user_id"])
+
+
+@router.delete("/friends/{friend_id}/pool/{gift_id}", response_model=list[PoolGift])
+async def delete_pool_gift(friend_id: str, gift_id: str, request: Request):
+    me = request.state.user["user_id"]
+    doc = await _pool_doc(friend_id, gift_id, me)
+    if doc["addedBy"]["user_id"] != me:
+        raise HTTPException(status_code=403, detail="Only the person who added it can remove it")
+    await raw_db.gift_pool.delete_one({"id": gift_id})
+    return await _pool(friend_id, me)
 
 
 class FriendGiftsIn(BaseModel):
@@ -265,3 +357,6 @@ async def delete(aid: str):
     if not res.deleted_count:
         raise HTTPException(status_code=404, detail="Event not found")
     return {"ok": True}
+
+
+UpcomingEvent.model_rebuild()

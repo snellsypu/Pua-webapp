@@ -443,3 +443,21 @@ Gift ideas have a 🛒 button in the event dialog → POST /api/shopping.
   (404 if their birthday isn't shared with you). 🎁 button on friend cards opens the list; gifts
   feed the 1-week/1-day heads-ups like your own. My-birthday saves merge into the latest value
   and show "Not shared yet" until the share box is ticked.
+
+## Birthday nudge, share-on-join, gift pool, work rota
+- users.birthday.declined: "Don't want to share" stops the BirthdayNudgeCard (Today + Anniversaries),
+  shown when you're in a bouquet and your birthday isn't set+shared. Sharing clears declined.
+- Share on join: POST /sharing/join returns joinedBouquetId; /join/:code and the Bouquets join box
+  open /sharing?welcome=<bid> → ShareOnJoinDialog (same chooser as memberships) → then /shared/<owner>.
+  Membership now carries ownerId.
+- Gift pool (raw `gift_pool` {id, friendId, bouquetIds (adder∩friend common bouquets), text, addedBy,
+  claimedBy}). Visible to anyone in one of those bouquets except the friend. Endpoints under
+  /api/anniversaries/friends/{fid}/pool: GET, POST {text}, POST /{gid}/claim (toggle; 409 if someone
+  else claimed), DELETE /{gid} (adder only, else 403). UpcomingEvent.pool; heads-up adds
+  "X (you're buying it)". UI: pool section in the friend gift dialog.
+- Work rota (scoped `jobs`): Job {name, rotaWeeks 1–4, startDate (snapped to Monday = week 1),
+  shifts [{week, weekday Mon=0, start, end (end<=start = overnight)}]}. /api/jobs CRUD; free 1 job,
+  Premium unlimited (402). GET /api/jobs/blocks?from&to. lib/work.expand → WorkBlock; included in
+  DayContext/RangeBundle.workBlocks, FriendCalendar.workBlocks and SharedPlanner.workBlocks (when the
+  person shares appointments) → shown as striped "Working · Job" blocks (DayAgenda, calendar cells 💼,
+  "Friends working" in the day sheet). Calendar header "Work rota" opens the editor.

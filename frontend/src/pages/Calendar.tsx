@@ -12,12 +12,13 @@ import {
   startOfMonth,
   startOfWeek,
 } from "date-fns";
-import { ChevronLeft, ChevronRight, Lock, Plus, Sprout, Users } from "lucide-react";
+import { Briefcase, ChevronLeft, ChevronRight, Lock, Plus, Sprout, Users } from "lucide-react";
 import { apiDelete, apiGet } from "@/lib/api";
 import type {
   Appointment,
   DayContext,
   FriendCalendar,
+  WorkBlock,
   HabitStats,
   Meal,
   RangeBundle,
@@ -26,6 +27,7 @@ import type {
 import { useToggleHabit } from "@/components/HabitList";
 import { addDaysIso, fmtDay } from "@/lib/dates";
 import { DayAgenda } from "@/components/DayAgenda";
+import { WorkBlockRow, WorkRotaDialog } from "@/components/WorkRota";
 import { FriendJoinButton } from "@/components/AppointmentJoin";
 import { MealSlots } from "@/components/MealSlots";
 import { ReminderList } from "@/components/ReminderList";
@@ -53,6 +55,7 @@ export default function Calendar() {
     queryFn: () => apiGet<DayContext>("/overview?offset=0"),
   });
   const today = todayQ.data?.date;
+  const [rotaOpen, setRotaOpen] = useState(false);
 
   const gridStart = startOfWeek(startOfMonth(month));
   const gridEnd = endOfWeek(endOfMonth(month));
@@ -92,6 +95,8 @@ export default function Calendar() {
     const appts = new Map<string, Appointment[]>();
     const meals = new Map<string, Meal[]>();
     const comps = new Map<string, Set<string>>();
+    const work = new Map<string, WorkBlock[]>();
+    for (const b of range.data?.workBlocks ?? []) work.set(b.date, [...(work.get(b.date) ?? []), b]);
     for (const a of range.data?.appointments ?? []) {
       appts.set(a.date, [...(appts.get(a.date) ?? []), a]);
     }
@@ -102,7 +107,7 @@ export default function Calendar() {
       if (!comps.has(c.date)) comps.set(c.date, new Set());
       comps.get(c.date)!.add(c.habitId);
     }
-    return { appts, meals, comps };
+    return { appts, meals, comps, work };
   }, [range.data]);
 
   const delAppt = useMutation({
@@ -133,6 +138,9 @@ export default function Calendar() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="font-heading text-3xl font-bold tracking-tight">{format(month, "MMMM yyyy")}</h1>
         <div className="flex gap-2">
+          <Button variant="outline" size="sm" data-testid="calendar-work-rota-button" onClick={() => setRotaOpen(true)}>
+            <Briefcase className="size-4" /> Work rota
+          </Button>
           <Button variant="outline" size="icon-sm" data-testid="calendar-prev-month" aria-label="Previous month" onClick={() => setMonth(addMonths(month, -1))}>
             <ChevronLeft className="size-4" />
           </Button>
@@ -158,8 +166,9 @@ export default function Calendar() {
           const habitDone = byDate.comps.get(iso)?.size ?? 0;
           const habitTotal = habits.data?.length ?? 0;
           const friendTones = showFriends
-            ? friendLayers.filter((f) => f.appointments.some((a) => a.date === iso))
+            ? friendLayers.filter((f) => f.appointments.some((a) => a.date === iso) || f.workBlocks.some((b) => b.date === iso))
             : [];
+          const working = byDate.work.get(iso) ?? [];
           return (
             <button
               key={iso}
@@ -183,6 +192,12 @@ export default function Calendar() {
                   </span>
                 )}
               </span>
+              {working.length > 0 && (
+                <span className="mt-0.5 truncate rounded bg-sky-500/15 px-1 text-[9px] font-semibold text-sky-800 dark:text-sky-200" title={working.map((b) => `${b.name} ${b.startTime}–${b.endTime}`).join(", ")}
+                  data-testid={`calendar-work-${iso}`}>
+                  💼 {working[0].startTime}
+                </span>
+              )}
               <div className="mt-auto flex items-center gap-1">
                 {appts.length > 0 && (
                   <span className="rounded-full bg-primary px-1.5 py-0.5 font-mono text-[10px] text-primary-foreground" title={`${appts.length} appointments`}>
@@ -250,6 +265,7 @@ export default function Calendar() {
                 </Button>
               </div>
               <DayAgenda
+                workBlocks={byDate.work.get(selected ?? "") ?? []}
                 appointments={selectedAppointments}
                 onEdit={(a) => {
                   setApptDraft({ ...a });
@@ -258,6 +274,18 @@ export default function Calendar() {
                 onDelete={(a) => delAppt.mutate(a.id)}
               />
             </section>
+            {selected && showFriends && friendLayers.some((f) => f.workBlocks.some((b) => b.date === selected)) && (
+              <section data-testid="calendar-sheet-friends-work">
+                <h3 className="mb-2 flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  <Briefcase className="size-3.5" /> Friends working
+                </h3>
+                <ul className="space-y-1.5">
+                  {friendLayers.flatMap((f) => f.workBlocks.filter((b) => b.date === selected).map((b) => (
+                    <WorkBlockRow key={`${f.owner.user_id}-${b.jobId}`} b={b} who={f.owner.name.split(" ")[0]} />
+                  )))}
+                </ul>
+              </section>
+            )}
             {selected && friendsOn(selected).length > 0 && (
               <section data-testid="calendar-sheet-friends">
                 <h3 className="mb-2 flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
@@ -321,6 +349,7 @@ export default function Calendar() {
       </Sheet>
 
       <AppointmentDialog open={apptOpen} onOpenChange={setApptOpen} initial={apptDraft} />
+      <WorkRotaDialog open={rotaOpen} onOpenChange={setRotaOpen} today={today ?? format(new Date(), "yyyy-MM-dd")} />
     </motion.div>
   );
 }

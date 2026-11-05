@@ -84,7 +84,7 @@ export default function Evening() {
               <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 Appointments
               </p>
-              <DayAgenda appointments={today?.appointments ?? []} emptyLabel="No appointments today" />
+              <DayAgenda appointments={today?.appointments ?? []} workBlocks={today?.workBlocks ?? []} emptyLabel="No appointments today" />
             </div>
             <div>
               <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
@@ -125,6 +125,7 @@ export default function Evening() {
                 Appointments
               </p>
               <DayAgenda
+                workBlocks={tomorrow?.workBlocks ?? []}
                 appointments={tomorrow?.appointments ?? []}
                 emptyLabel="Tomorrow is wide open"
               />

@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { AnniversaryHeadsUp } from "@/components/AnniversaryCards";
+import { AnniversaryHeadsUp, BirthdayNudgeCard } from "@/components/AnniversaryCards";
 import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { motion } from "motion/react";
@@ -211,6 +211,7 @@ export default function Home() {
       </div>
 
       <LeaveCountdown />
+      <BirthdayNudgeCard />
       <AnniversaryHeadsUp />
 
       <div className="grid grid-cols-1 gap-6 md:grid-cols-12">
@@ -256,6 +257,7 @@ export default function Home() {
           </CardHeader>
           <CardContent>
             <DayAgenda
+              workBlocks={data?.workBlocks ?? []}
               appointments={appointments}
               onEdit={(a) => {
                 setApptDraft({ ...a });

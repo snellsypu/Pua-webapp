@@ -6,7 +6,7 @@ import { LeaderboardButton } from "@/components/Leaderboard";
 import { QRCodeSVG } from "qrcode.react";
 import { usePaywall, usePremium } from "@/components/Paywall";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Link } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "motion/react";
 import { toast } from "sonner";
@@ -98,6 +98,35 @@ function MembershipCard({ m }: { m: Membership }) {
       </div>
       <ShareChooser tid={tid} categories={m.categories} shoppingEdit={m.shoppingEdit} pending={update.isPending} onChange={(u) => update.mutate(u)} />
     </li>
+  );
+}
+
+/** Right after joining: choose what you share with everyone in that bouquet. */
+function ShareOnJoinDialog({ bouquetId, onClose }: { bouquetId: string | null; onClose: () => void }) {
+  const navigate = useNavigate();
+  const s = useQuery({ queryKey: ["sharing"], queryFn: () => apiGet<SharingState>("/sharing") }).data;
+  const { wrap } = useSharingMutations();
+  const m = s?.memberships.find((x) => x.bouquetId === bouquetId);
+  const update = useMutation(wrap((u: MembershipUpdate) => apiPut<SharingState>(`/sharing/memberships/${bouquetId}`, u)));
+  const done = () => {
+    toast.success(m?.categories.length ? `You're sharing ${m.categories.length} with ${m.bouquetName}` : "You're not sharing anything yet — change it any time here");
+    onClose();
+    if (m) navigate(`/shared/${m.ownerId}`);
+  };
+  return (
+    <Dialog open={!!m} onOpenChange={(o) => !o && done()}>
+      <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-md" data-testid="share-on-join-dialog">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 font-heading"><Flower kind="plumeria" className="pua-bloom size-6" /> Welcome to {m?.bouquetName}!</DialogTitle>
+          <DialogDescription>What would you like to share with everyone in it? Private appointments always show as &ldquo;Unavailable&rdquo;.</DialogDescription>
+        </DialogHeader>
+        {m && <ShareChooser tid="join-share" categories={m.categories} shoppingEdit={m.shoppingEdit} pending={update.isPending} onChange={(u) => update.mutate(u)} />}
+        <div className="flex justify-end gap-2">
+          <Button variant="ghost" onClick={done} data-testid="share-on-join-skip">Not now</Button>
+          <Button onClick={done} disabled={update.isPending} data-testid="share-on-join-done">Done</Button>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -236,14 +265,18 @@ export default function Sharing() {
     onSuccess: (s: SharingState, n: string) => { qc.setQueryData(["sharing"], s); setNewName(""); toast.success(`${n} bouquet made — share its code`); },
   });
   const atLimit = !!s && !premium.data?.active && s.bouquets.length >= (premium.data?.freeBouquets ?? 2);
+  const [params, setParams] = useSearchParams();
+  const welcome = params.get("welcome");
   const join = useMutation({
-    ...wrap((c: string) => apiPost<SharingState>("/sharing/join", { code: c }), () => "Joined! Now choose what you share with them below"),
+    ...wrap((c: string) => apiPost<SharingState>("/sharing/join", { code: c }), () => "Joined!"),
+    onSuccess: (st: SharingState) => { qc.setQueryData(["sharing"], st); qc.invalidateQueries({ queryKey: ["friends-calendar"] }); toast.success("Joined!"); if (st.joinedBouquetId) setParams({ welcome: st.joinedBouquetId }); },
     onSettled: () => setCode(""),
   });
   const leave = useMutation(wrap((id: string) => apiDelete<SharingState>(`/sharing/joined/${id}`), () => "Left that planner"));
 
   return (
     <div className="mx-auto max-w-4xl space-y-6" data-testid="sharing-page">
+      <ShareOnJoinDialog bouquetId={welcome} onClose={() => setParams({})} />
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="font-heading text-3xl font-bold tracking-tight">Bouquets</h1>

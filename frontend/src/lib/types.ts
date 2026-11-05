@@ -241,6 +241,7 @@ export interface DayContext {
   appointments: Appointment[];
   meals: Meal[];
   reminders: Reminder[];
+  workBlocks: WorkBlock[];
 }
 
 export interface RangeBundle {
@@ -250,6 +251,7 @@ export interface RangeBundle {
   meals: Meal[];
   reminders: Reminder[];
   completions: HabitCompletion[];
+  workBlocks: WorkBlock[];
 }
 
 export interface WeatherNow {
@@ -451,6 +453,7 @@ export interface Bouquet {
 export interface Membership {
   bouquetId: string;
   bouquetName: string;
+  ownerId: string;
   ownerName: string;
   categories: ShareCategory[];
   shoppingEdit: boolean;
@@ -466,6 +469,7 @@ export interface SharingState {
   joined: JoinedPlanner[];
   joinedOwnerId: string | null; // set by POST /sharing/join
   memberships: Membership[]; // bouquets you joined + what YOU share in each
+  joinedBouquetId?: string | null; // set by POST /join
 }
 
 export type FlowerKind = "plumeria" | "pink-plumeria" | "hibiscus" | "ilima" | "lehua";
@@ -493,6 +497,7 @@ export interface SharedPlanner {
   shopping: ShoppingItem[] | null;
   notes: AppointmentNote[]; // bouquet notes you can see
   noteBouquets: BouquetRef[]; // their bouquets you can post notes in
+  workBlocks: WorkBlock[] | null; // "Working" blocks when appointments are shared
 }
 
 // Mirrors FriendCalendar in backend/models/sharing.py — calendar overlay
@@ -501,6 +506,7 @@ export interface FriendCalendar {
   appointments: Appointment[];
   bouquetId: string | null; // default colour = this bouquet's flower
   color: FlowerKind | null; // your pick overrides it
+  workBlocks: WorkBlock[];
 }
 
 // Mirrors OnboardIn in backend/models/auth.py
@@ -642,6 +648,7 @@ export interface MyBirthday {
   date: string | null; // MM-DD
   year: number | null; // birth year → bouquet sees your age
   share: boolean; // bouquet friends see it
+  declined: boolean; // "Don't want to share" — stops the bouquet nudge
 }
 export interface Anniversary extends AnniversaryIn {
   id: string;
@@ -659,10 +666,46 @@ export interface UpcomingEvent {
   friend: string | null; // user_id when it's a bouquet friend's shared birthday
   milestone: string | null; // "18th", "Big 40", "Silver"…
   gifts: GiftIdea[]; // your private gift ideas for a bouquet friend's birthday
+  pool: PoolGift[]; // the bouquet's shared ideas for a friend (never shown to the friend)
 }
 export interface HolidaySetState {
   id: string;
   label: string;
   group: string;
   enabled: boolean;
+}
+
+export interface PoolGift {
+  id: string;
+  text: string;
+  addedBy: string; // first name
+  mine: boolean;
+  claimedBy: string | null; // first name of whoever's buying it
+  claimedByMe: boolean;
+}
+
+// ---- work rota (backend/models/jobs.py)
+export interface Shift {
+  week: number; // 1..rotaWeeks
+  weekday: number; // Mon=0 … Sun=6
+  start: string; // HH:MM
+  end: string; // HH:MM — earlier than start = finishes next morning
+}
+export interface JobIn {
+  name: string;
+  rotaWeeks: number; // 1–4
+  startDate: string; // a day in week 1 (snapped to Monday)
+  shifts: Shift[];
+}
+export interface Job extends JobIn {
+  id: string;
+  createdAt: string;
+}
+export interface WorkBlock {
+  jobId: string;
+  name: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  overnight: boolean;
 }

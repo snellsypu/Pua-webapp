@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { SharedAppointmentNotes } from "@/components/BouquetNotes";
 import { FriendJoinButton } from "@/components/AppointmentJoin";
+import { WorkBlockRow } from "@/components/WorkRota";
 import { FlowerTick, flowerFor } from "@/components/Flower";
 import { Link, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -77,7 +78,12 @@ export default function SharedPlannerPage() {
 
       <div className="grid gap-6 md:grid-cols-2">
         {p?.appointments && (
-          <Section title="Appointments · next 2 weeks" id="appointments" empty={!p.appointments.length}>
+          <Section title="Appointments · next 2 weeks" id="appointments" empty={!p.appointments.length && !p.workBlocks?.length}>
+            {!!p.workBlocks?.length && (
+              <ul className="mb-2 space-y-1.5" data-testid="shared-work-blocks">
+                {p.workBlocks.map((b) => <WorkBlockRow key={`${b.jobId}-${b.date}`} b={b} who={b.date === p.today ? "Today" : fmtShort(b.date)} />)}
+              </ul>
+            )}
             <ul className="space-y-2">
               {p.appointments.map((a) => (
                 <li key={a.id} className={cn("flex gap-3 rounded-xl border px-3 py-2", a.private && "border-dashed bg-muted/40")} data-testid={`shared-appointment-${a.id}`}>

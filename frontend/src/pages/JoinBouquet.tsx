@@ -21,7 +21,7 @@ export default function JoinBouquet() {
       qc.invalidateQueries({ queryKey: ["friends-calendar"] });
       const owner = s.joined.find((j) => j.user_id === s.joinedOwnerId);
       toast.success(owner ? `You're in ${owner.name.split(" ")[0]}'s bouquet` : "Joined the bouquet");
-      navigate(s.joinedOwnerId ? `/shared/${s.joinedOwnerId}` : "/sharing", { replace: true });
+      navigate(s.joinedBouquetId ? `/sharing?welcome=${s.joinedBouquetId}` : "/sharing", { replace: true });
     },
   });
 

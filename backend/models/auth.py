@@ -60,6 +60,7 @@ class Membership(BaseModel):
     """A bouquet you joined, and what YOU share with everyone in it."""
     bouquetId: str
     bouquetName: str
+    ownerId: str
     ownerName: str
     categories: list[ShareCategory] = Field(default_factory=list)
     shoppingEdit: bool = True
@@ -76,6 +77,7 @@ class SharingState(BaseModel):
     joined: list[JoinedPlanner]  # everyone in your bouquets and what they share with you
     memberships: list[Membership] = Field(default_factory=list)  # bouquets you joined + what you share
     joinedOwnerId: str | None = None  # set by POST /join — whose planner you just joined
+    joinedBouquetId: str | None = None  # set by POST /join — the bouquet you just joined
 
 
 class BouquetCreate(BaseModel):

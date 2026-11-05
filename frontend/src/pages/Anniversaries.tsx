@@ -1,5 +1,6 @@
 // Anniversaries tab: birthdays, anniversaries, your own yearly events and holiday sets,
 // each with a countdown. Heads-ups (1 week / 1 day / today) also go in the morning briefing.
+import { BirthdayNudgeCard } from "@/components/AnniversaryCards";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -7,8 +8,8 @@ import { motion } from "motion/react";
 import { toast } from "sonner";
 import { CalendarHeart, Gift, Pencil, Plus, Settings2, ShoppingCart, Trash2, X } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
-import { apiDelete, apiGet, apiPost, apiPut } from "@/lib/api";
-import type { Anniversary, AnniversaryIn, AnniversaryKind, GiftIdea, UpcomingEvent } from "@/lib/types";
+import { ApiError, apiDelete, apiGet, apiPost, apiPut } from "@/lib/api";
+import type { Anniversary, AnniversaryIn, AnniversaryKind, GiftIdea, PoolGift, UpcomingEvent } from "@/lib/types";
 import { fmtShort } from "@/lib/dates";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -60,10 +61,30 @@ function FriendGiftDialog({ e, onClose }: { e: UpcomingEvent | null; onClose: ()
     onError: () => toast.error("Could not add to the shopping list"),
   });
   const change = (g: GiftIdea[]) => { setGifts(g); save.mutate(g); };
+  const [pool, setPool] = useState<PoolGift[]>([]);
+  const [poolText, setPoolText] = useState("");
+  useEffect(() => { setPool(e?.pool ?? []); setPoolText(""); }, [e]);
+  const poolBase = `/anniversaries/friends/${e?.friend}/pool`;
+  const poolDone = (p: PoolGift[]) => { setPool(p); qc.invalidateQueries({ queryKey: ["anniversaries"] }); };
+  const poolAdd = useMutation({
+    mutationFn: (text: string) => apiPost<PoolGift[]>(poolBase, { text }),
+    onSuccess: (p) => { poolDone(p); setPoolText(""); toast.success("Added to the bouquet pool 💐"); },
+    onError: () => toast.error("Couldn't add to the pool"),
+  });
+  const poolClaim = useMutation({
+    mutationFn: (id: string) => apiPost<PoolGift[]>(`${poolBase}/${id}/claim`),
+    onSuccess: (p, id) => { poolDone(p); toast.success(p.find((g) => g.id === id)?.claimedByMe ? "You're buying it — everyone else can see that" : "Unclaimed"); },
+    onError: (err) => toast.error(err instanceof ApiError && err.status === 409 ? "Someone else is already buying that" : "Couldn't update the gift"),
+  });
+  const poolDel = useMutation({
+    mutationFn: (id: string) => apiDelete<PoolGift[]>(`${poolBase}/${id}`),
+    onSuccess: poolDone,
+    onError: () => toast.error("Couldn't remove that idea"),
+  });
   const add = () => { const t = text.trim(); if (t) { change([...gifts, { id: crypto.randomUUID(), text: t, bought: false }]); setText(""); } };
   return (
     <Dialog open={!!e} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="sm:max-w-md" data-testid="friend-gift-dialog">
+      <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-md" data-testid="friend-gift-dialog">
         <DialogHeader>
           <DialogTitle className="font-heading">🎈 {e ? eventLabel(e) : ""}</DialogTitle>
           <DialogDescription>{e ? `${fmtShort(e.next)}${e.years ? ` · turns ${e.years}` : ""}` : ""} — only you can see this gift list.</DialogDescription>
@@ -90,6 +111,41 @@ function FriendGiftDialog({ e, onClose }: { e: UpcomingEvent | null; onClose: ()
           <Input value={text} onChange={(ev) => setText(ev.target.value)} maxLength={80} placeholder="e.g. Silk scarf" className="h-8 text-sm"
             onKeyDown={(ev) => { if (ev.key === "Enter") { ev.preventDefault(); add(); } }} data-testid="friend-gift-input" />
           <Button type="button" size="sm" variant="outline" className="h-8" onClick={add} disabled={!text.trim()} data-testid="friend-gift-add"><Plus className="size-3.5" /> Add</Button>
+        </div>
+        <div className="space-y-2 rounded-2xl border border-pink-400/40 bg-pink-500/5 p-3" data-testid="gift-pool">
+          <div>
+            <p className="text-sm font-semibold">💐 Bouquet gift pool</p>
+            <p className="text-xs text-muted-foreground">Everyone in your bouquets with {e?.title} sees these — {e?.title} never does. Claim one so nobody doubles up.</p>
+          </div>
+          <ul className="grid gap-1.5" data-testid="gift-pool-list">
+            {pool.map((g) => (
+              <li key={g.id} className="flex items-center gap-2 text-sm" data-testid={`gift-pool-item-${g.id}`}>
+                <span className="min-w-0 flex-1">
+                  <span className={cn("block truncate", g.claimedBy && !g.claimedByMe && "text-muted-foreground")}>{g.text}</span>
+                  <span className="block text-[11px] text-muted-foreground">{g.mine ? "your idea" : `${g.addedBy}'s idea`}</span>
+                </span>
+                {g.claimedBy && !g.claimedByMe ? (
+                  <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium" data-testid={`gift-pool-claimed-${g.id}`}>🛍️ {g.claimedBy} is buying</span>
+                ) : (
+                  <Button size="xs" variant={g.claimedByMe ? "secondary" : "outline"} disabled={poolClaim.isPending} onClick={() => poolClaim.mutate(g.id)} data-testid={`gift-pool-claim-${g.id}`}>
+                    {g.claimedByMe ? "✓ You're buying" : "I'm buying this"}
+                  </Button>
+                )}
+                {g.mine && (
+                  <button type="button" aria-label="Remove" onClick={() => poolDel.mutate(g.id)} disabled={poolDel.isPending}
+                    className="rounded p-0.5 text-muted-foreground hover:text-foreground" data-testid={`gift-pool-remove-${g.id}`}><X className="size-3.5" /></button>
+                )}
+              </li>
+            ))}
+            {!pool.length && <li className="text-xs text-muted-foreground">No shared ideas yet.</li>}
+          </ul>
+          <div className="flex gap-2">
+            <Input value={poolText} onChange={(ev) => setPoolText(ev.target.value)} maxLength={80} placeholder="Suggest a gift for everyone…" className="h-8 text-sm"
+              onKeyDown={(ev) => { if (ev.key === "Enter" && poolText.trim()) { ev.preventDefault(); poolAdd.mutate(poolText.trim()); } }} data-testid="gift-pool-input" />
+            <Button type="button" size="sm" variant="outline" className="h-8" disabled={!poolText.trim() || poolAdd.isPending} onClick={() => poolAdd.mutate(poolText.trim())} data-testid="gift-pool-add">
+              <Plus className="size-3.5" /> Share
+            </Button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>
@@ -225,6 +281,7 @@ export default function Anniversaries() {
           <Button onClick={() => open(null)} data-testid="anniversary-add"><Plus className="size-4" /> Add</Button>
         </div>
       </header>
+      <BirthdayNudgeCard />
       <div className="flex gap-1.5" role="tablist">
         {(["all", "people", "holiday"] as Filter[]).map((k) => (
           <button key={k} role="tab" aria-selected={filter === k} onClick={() => setFilter(k)} data-testid={`anniversaries-filter-${k}`}

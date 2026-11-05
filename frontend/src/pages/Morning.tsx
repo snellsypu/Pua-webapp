@@ -69,6 +69,7 @@ export default function Morning() {
           </CardHeader>
           <CardContent>
             <DayAgenda
+              workBlocks={data?.workBlocks ?? []}
               appointments={data?.appointments ?? []}
               onEdit={(a) => {
                 setApptDraft({ ...a });
