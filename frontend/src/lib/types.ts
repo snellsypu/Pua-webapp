@@ -179,6 +179,22 @@ export interface Meal {
   slot: MealSlot;
   title: string;
   notes: string;
+  ingredients: string[];
+}
+export interface MealUpsert {
+  date: string;
+  slot: MealSlot;
+  title: string;
+  notes: string;
+  ingredients?: string[] | null; // omitted = keep / fill from the remembered recipe
+}
+export interface Recipe {
+  title: string;
+  ingredients: string[];
+}
+export interface ShoppingSuggestion {
+  name: string;
+  meals: string[];
 }
 
 export interface ShoppingItem {
@@ -600,6 +616,7 @@ export interface UpcomingEvent {
   years: number | null;
   custom: Anniversary | null;
   friend: string | null; // user_id when it's a bouquet friend's shared birthday
+  milestone: string | null; // "18th", "Big 40", "Silver"…
 }
 export interface HolidaySetState {
   id: string;

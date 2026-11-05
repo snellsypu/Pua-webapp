@@ -381,6 +381,7 @@ class Meal(BaseModel):
     slot: str
     title: str
     notes: str = ""
+    ingredients: list[str] = Field(default_factory=list)
 
     @field_validator("date")
     @classmethod
@@ -400,6 +401,8 @@ class MealUpsert(BaseModel):
     slot: str
     title: str = Field(min_length=1)
     notes: str = ""
+    # None = keep what the meal already has, or fill in from the remembered recipe
+    ingredients: list[str] | None = Field(default=None, max_length=30)
 
     @field_validator("date")
     @classmethod
@@ -412,6 +415,30 @@ class MealUpsert(BaseModel):
         if v not in MEAL_SLOTS:
             raise ValueError(f"slot must be one of {MEAL_SLOTS}")
         return v
+
+
+def clean_ingredients(items: list[str]) -> list[str]:
+    seen: dict[str, str] = {}
+    for i in items:
+        t = " ".join(i.split())[:40]
+        if t and t.lower() not in seen:
+            seen[t.lower()] = t
+    return list(seen.values())[:30]
+
+
+class Recipe(BaseModel):
+    """Remembered ingredients for a meal name (reused whenever the meal is planned again)."""
+    title: str
+    ingredients: list[str] = Field(default_factory=list)
+
+
+class RecipeGuessIn(BaseModel):
+    title: str = Field(min_length=1, max_length=80)
+
+
+class ShoppingSuggestion(BaseModel):
+    name: str
+    meals: list[str]  # the planned meals that need it
 
 
 # ---------------------------------------------------------------- shopping

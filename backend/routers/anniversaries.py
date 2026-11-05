@@ -58,6 +58,7 @@ class UpcomingEvent(BaseModel):
     years: int | None = None  # "turns N" / "N years" on the next occurrence
     custom: Anniversary | None = None  # editable fields (custom events only)
     friend: str | None = None  # user_id when it's a bouquet friend's shared birthday
+    milestone: str | None = None  # e.g. "18th", "Big 40", "Silver" — decades + English milestones
 
 
 class HolidaySetState(BaseModel):
@@ -84,6 +85,33 @@ class HolidaySetsIn(BaseModel):
 
 
 EMOJI = {"birthday": "🎂", "anniversary": "💞", "event": "📅"}
+# English milestones on top of every decade: coming of age, plus the traditional anniversary names
+BIRTHDAY_MILESTONES = {18: "18th", 21: "21st"}
+ANNIVERSARY_NAMES = {1: "Paper", 5: "Wood", 10: "Tin", 20: "China", 25: "Silver", 30: "Pearl", 40: "Ruby",
+                     50: "Golden", 60: "Diamond", 65: "Sapphire", 70: "Platinum", 80: "Oak"}
+
+
+def milestone(kind: str, years: int | None) -> str | None:
+    if not years or years < 1:
+        return None
+    if kind == "birthday":
+        return BIRTHDAY_MILESTONES.get(years) or (f"Big {years}" if years % 10 == 0 else None)
+    if kind == "anniversary":
+        return ANNIVERSARY_NAMES.get(years) or (f"{years}th" if years % 10 == 0 else None)
+    return None
+
+
+def spoken_name(e: "UpcomingEvent") -> str:
+    """"Mum turns 60 — a milestone birthday" / "Wedding — 25 years, the Silver anniversary"."""
+    if e.kind == "birthday":
+        if not e.years:
+            return f"{e.title}'s birthday"
+        return f"{e.title} turns {e.years}" + (" — a milestone birthday" if e.milestone else "")
+    if e.kind == "anniversary" and e.years:
+        named = e.milestone if e.milestone in ANNIVERSARY_NAMES.values() else None
+        return f"{e.title} — {e.years} year{'s' if e.years != 1 else ''}" + (
+            f", the {named} anniversary" if named else " — a milestone" if e.milestone else "")
+    return e.title
 
 
 def _next(md: str, today: date) -> date:
@@ -129,7 +157,8 @@ async def upcoming(days: int = 366) -> list[UpcomingEvent]:
         nxt = _next(ann.date, today)
         out.append(UpcomingEvent(
             id=ann.id, title=ann.title, emoji=ann.emoji or EMOJI[ann.kind], kind=ann.kind, next=nxt.isoformat(),
-            daysUntil=(nxt - today).days, years=(nxt.year - ann.year) if ann.year else None, custom=ann))
+            daysUntil=(nxt - today).days, years=(yrs := (nxt.year - ann.year) if ann.year else None),
+            milestone=milestone(ann.kind, yrs), custom=ann))
     for h in holidays_between(await _sets(), today, today + timedelta(days=days)):
         out.append(UpcomingEvent(
             id=f"holiday:{h['set']}:{h['date'].isoformat()}:{h['title']}", title=h["title"], emoji=h["emoji"],
@@ -140,12 +169,7 @@ async def upcoming(days: int = 366) -> list[UpcomingEvent]:
 
 def heads_up_line(events: list[UpcomingEvent]) -> str:
     """Briefing sentence for events today, tomorrow and in a week ("" if none)."""
-    def name(e: UpcomingEvent) -> str:
-        if e.kind == "birthday":
-            return f"{e.title}'s birthday" + (f" (turning {e.years})" if e.years else "")
-        if e.kind == "anniversary":
-            return e.title + (f" ({e.years} years)" if e.years else "")
-        return e.title
+    name = spoken_name
     def gifts(e: UpcomingEvent) -> str:
         todo = [g.text for g in (e.custom.gifts if e.custom else []) if not g.bought]
         return f" — gift ideas: {', '.join(todo[:4])}" if todo else ""

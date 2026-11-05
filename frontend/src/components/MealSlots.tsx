@@ -33,6 +33,8 @@ function SlotRow({
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ["overview"] });
     qc.invalidateQueries({ queryKey: ["range"] });
+    qc.invalidateQueries({ queryKey: ["meals-week"] });
+    qc.invalidateQueries({ queryKey: ["meal-suggestions"] });
   };
   const upsert = useMutation({
     mutationFn: () =>

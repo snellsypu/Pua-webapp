@@ -22,6 +22,7 @@ const PERKS = [
   { icon: Mic, text: "AI voice — say it any way you like, works on iPhone" },
   { icon: Users, text: "Unlimited bouquets, with more than 6 people in each" },
   { icon: Route, text: "Travel mode per appointment & live-location commutes" },
+  { icon: Sparkles, text: "AI ingredient ideas for every meal you plan" },
 ];
 
 function PaywallDialog({ open, onOpenChange, reason }: { open: boolean; onOpenChange: (o: boolean) => void; reason?: string }) {

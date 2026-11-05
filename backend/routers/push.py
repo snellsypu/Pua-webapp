@@ -159,7 +159,7 @@ async def run_routine_notifications() -> None:
 
 async def _anniversary_alert(now_local: datetime, local_date: str) -> None:
     """Once a day at the morning routine time: push events 1 week and 1 day away (+ gift ideas)."""
-    from routers.anniversaries import upcoming
+    from routers.anniversaries import spoken_name, upcoming
 
     routine = await db.routines.find_one({"kind": "morning"}) or {}
     hh, mm = (int(p) for p in (routine.get("time") or "07:00").split(":"))
@@ -175,7 +175,7 @@ async def _anniversary_alert(now_local: datetime, local_date: str) -> None:
     if not (claimed.modified_count or claimed.upserted_id) or not events:
         return
     def line(e) -> str:
-        n = f"{e.title}'s birthday" if e.kind == "birthday" else e.title
+        n = spoken_name(e)
         todo = [g.text for g in (e.custom.gifts if e.custom else []) if not g.bought]
         return f"{'Tomorrow' if e.daysUntil == 1 else 'In 1 week'}: {n}" + (f" (gifts: {', '.join(todo[:3])})" if todo else "")
     result = await push_lib.send_to_all("Coming up 🎂", " · ".join(line(e) for e in events[:4]), url="/anniversaries", tag="anniversaries")

@@ -25,7 +25,7 @@ current_owner: ContextVar[str | None] = ContextVar("current_owner", default=None
 SCOPED = {
     "settings", "appointments", "habits", "habit_completions", "meals", "shopping_items",
     "reminders", "health_events", "routines", "routine_checks", "push_subscriptions",
-    "anniversaries", "anniversary_prefs",
+    "anniversaries", "anniversary_prefs", "meal_recipes",
 }
 
 

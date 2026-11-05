@@ -2,12 +2,12 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { motion } from "motion/react";
 import { toast } from "sonner";
-import { format, parseISO } from "date-fns";
+import { format, parseISO, startOfWeek } from "date-fns";
 import { CalendarDays, ChevronLeft, ChevronRight, ShoppingCart, Trash2 } from "lucide-react";
 import { apiDelete, apiGet, apiPatch, apiPost } from "@/lib/api";
-import type { DayContext, RangeBundle, ShoppingItem } from "@/lib/types";
+import type { DayContext, ShoppingItem } from "@/lib/types";
 import { addDaysIso } from "@/lib/dates";
-import { MealSlots } from "@/components/MealSlots";
+import { MealWeek, ShoppingSuggestions } from "@/components/MealWeek";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -21,15 +21,12 @@ export default function Planner() {
     queryKey: ["overview", 0],
     queryFn: () => apiGet<DayContext>("/overview?offset=0"),
   });
-  const [picked, setPicked] = useState<string | null>(null);
+  const today = todayQ.data?.date ?? null;
+  const [weekStart, setWeekStart] = useState<string | null>(null);
   const [pickerMonth, setPickerMonth] = useState<Date>(new Date());
-  const date = picked ?? todayQ.data?.date ?? null;
+  const monday = (iso: string) => format(startOfWeek(parseISO(`${iso}T12:00:00`), { weekStartsOn: 1 }), "yyyy-MM-dd");
+  const week = weekStart ?? (today ? monday(today) : null);
 
-  const range = useQuery({
-    queryKey: ["range", date, date],
-    queryFn: () => apiGet<RangeBundle>(`/range?from=${date}&to=${date}`),
-    enabled: !!date,
-  });
   const shopping = useQuery({
     queryKey: ["shopping"],
     queryFn: () => apiGet<ShoppingItem[]>("/shopping"),
@@ -40,7 +37,7 @@ export default function Planner() {
   const updateItem = useMutation({
     mutationFn: (v: { id: string; name?: string; checked?: boolean }) =>
       apiPatch<ShoppingItem>(`/shopping/${v.id}`, { name: v.name, checked: v.checked }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["shopping"] }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["shopping"] }); qc.invalidateQueries({ queryKey: ["meal-suggestions"] }); },
     onError: () => toast.error("Could not update the shopping list"),
   });
   const addItem = useMutation({
@@ -48,18 +45,20 @@ export default function Planner() {
     onSuccess: () => {
       setItemName("");
       qc.invalidateQueries({ queryKey: ["shopping"] });
+      qc.invalidateQueries({ queryKey: ["meal-suggestions"] });
     },
     onError: () => toast.error("Could not add the item"),
   });
   const deleteItem = useMutation({
     mutationFn: (id: string) => apiDelete(`/shopping/${id}`),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["shopping"] }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["shopping"] }); qc.invalidateQueries({ queryKey: ["meal-suggestions"] }); },
     onError: () => toast.error("Could not remove the item"),
   });
   const clearChecked = useMutation({
     mutationFn: () => apiPost<{ deleted: number }>("/shopping/clear-checked"),
     onSuccess: (r) => {
       qc.invalidateQueries({ queryKey: ["shopping"] });
+      qc.invalidateQueries({ queryKey: ["meal-suggestions"] });
       toast.success(`Cleared ${r.deleted} bought item${r.deleted === 1 ? "" : "s"}`);
     },
     onError: () => toast.error("Could not clear the list"),
@@ -78,7 +77,7 @@ export default function Planner() {
       <div>
         <h1 className="font-heading text-3xl font-bold tracking-tight">Meal planner</h1>
         <p className="text-sm text-muted-foreground">
-          Plan the day&apos;s meals and send anything you need straight to the shopping list.
+          Plan the whole week, and the shopping list suggests what those meals need.
         </p>
       </div>
 
@@ -86,20 +85,17 @@ export default function Planner() {
         <Card className="lg:col-span-7">
           <CardHeader className="flex-col gap-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <CardTitle className="font-heading" data-testid="planner-date-label">
-                {date ? format(parseISO(`${date}T12:00:00`), "EEEE, MMM d") : "…"}
+              <CardTitle className="font-heading" data-testid="planner-week-label">
+                {week ? `${format(parseISO(`${week}T12:00:00`), "MMM d")} – ${format(parseISO(`${addDaysIso(week, 6)}T12:00:00`), "MMM d")}` : "…"}
               </CardTitle>
               <div className="flex items-center gap-1.5">
-                <Button
-                  variant="outline"
-                  size="icon-sm"
-                  data-testid="planner-prev-day"
-                  aria-label="Previous day"
-                  disabled={!date}
-                  onClick={() => date && setPicked(addDaysIso(date, -1))}
-                >
+                <Button variant="outline" size="icon-sm" data-testid="planner-prev-week" aria-label="Previous week"
+                  disabled={!week} onClick={() => week && setWeekStart(addDaysIso(week, -7))}>
                   <ChevronLeft className="size-4" />
                 </Button>
+                {today && week !== monday(today) && (
+                  <Button variant="outline" size="sm" data-testid="planner-this-week" onClick={() => setWeekStart(null)}>This week</Button>
+                )}
                 <Popover>
                   <PopoverTrigger
                     className="inline-flex h-8 items-center gap-1.5 rounded-lg border px-3 text-sm font-medium hover:bg-accent"
@@ -110,35 +106,26 @@ export default function Planner() {
                   <PopoverContent align="end" className="w-auto p-2">
                     <Calendar
                       mode="single"
+                      weekStartsOn={1}
                       month={pickerMonth}
                       onMonthChange={setPickerMonth}
-                      selected={date ? parseISO(`${date}T12:00:00`) : undefined}
+                      selected={week ? parseISO(`${week}T12:00:00`) : undefined}
                       onSelect={(d) => {
-                        if (d) setPicked(format(d, "yyyy-MM-dd"));
+                        if (d) setWeekStart(monday(format(d, "yyyy-MM-dd")));
                       }}
                     />
                   </PopoverContent>
                 </Popover>
-                <Button
-                  variant="outline"
-                  size="icon-sm"
-                  data-testid="planner-next-day"
-                  aria-label="Next day"
-                  disabled={!date}
-                  onClick={() => date && setPicked(addDaysIso(date, 1))}
-                >
+                <Button variant="outline" size="icon-sm" data-testid="planner-next-week" aria-label="Next week"
+                  disabled={!week} onClick={() => week && setWeekStart(addDaysIso(week, 7))}>
                   <ChevronRight className="size-4" />
                 </Button>
               </div>
             </div>
-            <CardDescription>Four slots per day — breakfast, lunch, dinner and a snack.</CardDescription>
+            <CardDescription>Tap any slot to plan it and list its ingredients — they&apos;re remembered for next time.</CardDescription>
           </CardHeader>
           <CardContent>
-            {date ? (
-              <MealSlots date={date} meals={range.data?.meals ?? []} />
-            ) : (
-              <div className="h-64 animate-pulse rounded-xl bg-muted" />
-            )}
+            {week && today ? <MealWeek weekStart={week} today={today} /> : <div className="h-64 animate-pulse rounded-xl bg-muted" />}
           </CardContent>
         </Card>
 
@@ -163,6 +150,7 @@ export default function Planner() {
             )}
           </CardHeader>
           <CardContent className="space-y-3">
+            {week && <ShoppingSuggestions weekStart={week} />}
             <div className="flex gap-2">
               <Input
                 value={itemName}

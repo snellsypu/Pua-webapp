@@ -44,8 +44,14 @@ tomorrow's preview). Public URL: https://daily-loop-8--68ipsq2d.preview.emergent
   per-date habit toggling, editable meals, reminders, add/edit/delete appointments.
 - `/habits` — create/edit/delete (name, emoji, mode, monthly target), today check-off,
   28-day heat strip per habit.
-- `/planner` — day navigation + date picker; 4 meal slots with inline edit; meal → shopping
-  list button; full shopping list management.
+- `/planner` — WEEK view (Mon–Sun, prev/next/"This week"/date picker) × 4 slots; tap a slot →
+  meal dialog (title + ingredient chips). Ingredients are remembered per meal name in scoped
+  `meal_recipes` {key, title, ingredients} (any tier): saving with ingredients stores the recipe;
+  planning the same name again fills them in (backend: MealUpsert.ingredients null = keep/recall).
+  Premium: "Suggest ingredients" → POST /api/meals/recipe/guess (Claude Sonnet 5.5; 402 if not
+  Premium). GET /api/meals/recipe?title=, GET /api/meals/suggestions?from&to → week's ingredients
+  not already on the shopping list (shown above the list with + per item and "Add all").
+  Day-level MealSlots remain on Today / overview / calendar (briefing still shows the day's meals).
 - `/overview` (pages/Overview.tsx) — ONE overview that follows the clock: `GET /api/daypart`
   → {part morning|evening, localTime, date, reviewTime} in settings.timezone; part = evening
   once localTime ≥ `settings.reviewTime` (default 18:00, editable in Settings → Overview &
@@ -370,6 +376,11 @@ christian (Easter-based), and table-driven islamic, jewish, hindu, sikh, buddhis
 the wake read-out and "what's my day" briefing, and shown as a "Coming up" card on Today and
 the morning overview. Settings: "Holidays in Anniversaries" checklist (UK / by religion /
 cultural).
+Milestones (UpcomingEvent.milestone): birthdays 18th, 21st and every decade ("Big 40");
+anniversaries every decade plus traditional names (1 Paper, 5 Wood, 10 Tin, 20 China, 25 Silver,
+30 Pearl, 40 Ruby, 50 Golden, 60 Diamond, 65 Sapphire, 70 Platinum, 80 Oak) → gold badge on
+Anniversaries + heads-up card. Briefing/push wording via spoken_name(): "Mum turns 60 — a
+milestone birthday", "Wedding — 25 years, the Silver anniversary".
 
 ## Jungle extras
 - Birdsong (lib/birdsong.ts, Web Audio synth): plays when a routine is newly finished or a

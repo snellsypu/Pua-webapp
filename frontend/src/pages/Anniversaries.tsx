@@ -31,6 +31,18 @@ export function eventLabel(e: UpcomingEvent) {
 const subLabel = (e: UpcomingEvent) =>
   e.friend ? "Bouquet friend" : e.kind === "birthday" && e.years ? `Turns ${e.years}` : e.kind === "anniversary" && e.years ? `${e.years} years` : e.kind === "holiday" ? "Holiday" : e.custom ? KIND_LABEL[e.custom.kind] : "";
 
+/** gold pill for decade birthdays, 18th/21st and named anniversaries (Silver, Ruby, Golden…) */
+export function MilestoneBadge({ e, className }: { e: UpcomingEvent; className?: string }) {
+  if (!e.milestone) return null;
+  const text = e.kind === "anniversary" && !/\d/.test(e.milestone) ? `${e.milestone} anniversary` : e.kind === "birthday" ? `Milestone · ${e.milestone}` : e.milestone;
+  return (
+    <span className={cn("inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-amber-300 to-yellow-200 px-2 py-0.5 text-[11px] font-bold text-amber-950 shadow-sm ring-1 ring-amber-500/40 animate-in fade-in zoom-in-95", className)}
+      data-testid={`anniversary-milestone-${e.id}`}>
+      ✨ {text}
+    </span>
+  );
+}
+
 export const useUpcoming = () => useQuery({ queryKey: ["anniversaries"], queryFn: () => apiGet<UpcomingEvent[]>("/anniversaries") });
 
 function EventDialog({ open, onOpenChange, initial }: { open: boolean; onOpenChange: (o: boolean) => void; initial: Anniversary | null }) {
@@ -165,6 +177,7 @@ export default function Anniversaries() {
                 <p className="text-xs uppercase tracking-wide text-muted-foreground">Next up · {fmtShort(hero.next)}</p>
                 <p className="font-heading text-2xl font-bold">{eventLabel(hero)}</p>
                 <p className="text-sm text-muted-foreground">{subLabel(hero)}</p>
+                <MilestoneBadge e={hero} className="mt-1.5" />
               </div>
               <div className="text-right">
                 <p className="font-heading text-5xl font-extrabold tabular-nums text-primary" data-testid="anniversary-next-countdown">{hero.daysUntil === 0 ? "🎉" : hero.daysUntil}</p>
@@ -189,6 +202,7 @@ export default function Anniversaries() {
             <span className="min-w-0 flex-1">
               <span className="block truncate text-sm font-medium">{eventLabel(e)}</span>
               <span className="block text-xs text-muted-foreground">{fmtShort(e.next)}{subLabel(e) ? ` · ${subLabel(e)}` : ""}</span>
+              <MilestoneBadge e={e} className="mt-1" />
               {!!e.custom?.gifts.filter((g) => !g.bought).length && (
                 <span className="mt-0.5 flex items-center gap-1 truncate text-[11px] text-pink-700 dark:text-pink-300" data-testid={`anniversary-gifts-${e.id}`}>
                   <Gift className="size-3" /> {e.custom.gifts.filter((g) => !g.bought).map((g) => g.text).join(", ")}

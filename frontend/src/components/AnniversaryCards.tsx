@@ -63,7 +63,8 @@ export function AnniversaryHeadsUp({ className }: { className?: string }) {
           {q.data.map((e) => (
             <li key={e.id} className="flex items-center gap-2 rounded-full bg-pink-500/10 px-3 py-1 text-sm" data-testid={`heads-up-${e.id}`}>
               <span>{e.emoji}</span>
-              <span className="font-medium">{e.kind === "birthday" ? `${e.title}'s birthday` : e.title}</span>
+              <span className="font-medium">{e.kind === "birthday" ? (e.years ? `${e.title} turns ${e.years}` : `${e.title}'s birthday`) : e.kind === "anniversary" && e.years ? `${e.title} · ${e.years} years` : e.title}</span>
+              {e.milestone && <span className="rounded-full bg-amber-300 px-1.5 text-[10px] font-bold text-amber-950" data-testid={`heads-up-milestone-${e.id}`}>✨ {e.milestone}</span>}
               <span className="text-xs text-muted-foreground">{when(e.daysUntil)}</span>
               {e.daysUntil > 0 && !!e.custom?.gifts.filter((g) => !g.bought).length && (
                 <span className="text-xs text-pink-700 dark:text-pink-300" data-testid={`heads-up-gifts-${e.id}`}>
