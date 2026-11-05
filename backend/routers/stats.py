@@ -98,6 +98,9 @@ class JobHours(BaseModel):
     weekShifts: int
     monthHours: float
     monthShifts: int
+    hourlyRate: float | None = None
+    weekPay: float | None = None  # estimated, hours × rate
+    monthPay: float | None = None
 
 
 class WorkHours(BaseModel):
@@ -105,6 +108,8 @@ class WorkHours(BaseModel):
     weekEnd: str
     month: str  # YYYY-MM
     jobs: list[JobHours]
+    weekPay: float | None = None  # all jobs with a rate
+    monthPay: float | None = None
 
 
 def _hours(b) -> float:
@@ -126,12 +131,18 @@ async def work_hours():
     ms = today.replace(day=1)
     me = (ms.replace(year=ms.year + 1, month=1) if ms.month == 12 else ms.replace(month=ms.month + 1)) - timedelta(days=1)
     blocks = await my_blocks(min(ws, ms).isoformat(), max(we, me).isoformat())
-    jobs = await db.jobs.find({}, {"_id": 0, "id": 1, "name": 1}).sort("createdAt", 1).to_list(100)
+    jobs = await db.jobs.find({}, {"_id": 0, "id": 1, "name": 1, "hourlyRate": 1}).sort("createdAt", 1).to_list(100)
     out = []
     for j in jobs:
         mine = [b for b in blocks if b.jobId == j["id"]]
         wk = [b for b in mine if ws.isoformat() <= b.date <= we.isoformat()]
         mo = [b for b in mine if ms.isoformat() <= b.date <= me.isoformat()]
-        out.append(JobHours(jobId=j["id"], name=j["name"], weekHours=round(sum(map(_hours, wk)), 2), weekShifts=len(wk),
-                            monthHours=round(sum(map(_hours, mo)), 2), monthShifts=len(mo)))
-    return WorkHours(weekStart=ws.isoformat(), weekEnd=we.isoformat(), month=ms.strftime("%Y-%m"), jobs=out)
+        wh, mh, rate = sum(map(_hours, wk)), sum(map(_hours, mo)), j.get("hourlyRate")
+        out.append(JobHours(jobId=j["id"], name=j["name"], weekHours=round(wh, 2), weekShifts=len(wk),
+                            monthHours=round(mh, 2), monthShifts=len(mo), hourlyRate=rate,
+                            weekPay=round(wh * rate, 2) if rate is not None else None,
+                            monthPay=round(mh * rate, 2) if rate is not None else None))
+    paid = [j for j in out if j.hourlyRate is not None]
+    return WorkHours(weekStart=ws.isoformat(), weekEnd=we.isoformat(), month=ms.strftime("%Y-%m"), jobs=out,
+                     weekPay=round(sum(j.weekPay or 0 for j in paid), 2) if paid else None,
+                     monthPay=round(sum(j.monthPay or 0 for j in paid), 2) if paid else None)

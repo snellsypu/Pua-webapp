@@ -1,0 +1,84 @@
+{
+  "iteration": 5,
+  "mode": "generate",
+  "passed": 8,
+  "failed": 0,
+  "summary": "Generated and ran artifacts for all 6 new 'Work rota' acceptance criteria: 2 backend test files (free-tier 402 limit + stats/work earnings math) and 6 browser checks (work tab + add button visibility incl. calendar icon-only button, Cara adding a job with a 2-week rota, Bob's hours & earnings card on /work and /stats, Bob's free-tier paywall, the logo-dropdown header nav at 390px/1280px, and the jungle background in light/dark mode), plus one of those re-run against the public preview URL. All 8 checks passed (one browser check needed 3 debugging iterations to make its own tscheck- job fixture cleanup/re-creation race-free; it now passes twice in a row). Noted but out of scope for this iteration: the full backend suite has 3 pre-existing failures in tests/test_tscheck_mutual_bouquet_sharing.py (RuntimeError: coroutine raised StopIteration on the async aclient fixture) unrelated to any criterion in this briefing — looks like a pytest-asyncio 1.4.1 compatibility regression, confirmed non-flaky on rerun.",
+  "bugs": [],
+  "action_items": [
+    {
+      "item": "Pre-existing regression (not in this iteration's scope): tests/test_tscheck_mutual_bouquet_sharing.py (3 tests using the async `aclient` fixture) fails with 'RuntimeError: coroutine raised StopIteration' under the installed pytest-asyncio 1.4.1.post1 / pytest 9.2.0. Confirmed non-flaky (failed twice). Worth a look since it blocks the full-suite green bar, though it does not affect the Work rota feature under test here.",
+      "severity": "low"
+    }
+  ],
+  "retest_needed": false,
+  "checks": [
+    {
+      "criterion": "Work rota has its own tab and the add button is visible",
+      "name": "work-tab-add-button-visible",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "At 390x844 as Cara: nav-logo -> nav-work opens /work; job-add-button and jobs-list visible and fully within the 390px viewport (boundingBox x=.. width <=390); /calendar still shows calendar-work-rota-button with its text span hidden (icon-only) at 390px."
+    },
+    {
+      "criterion": "Work rota has its own tab and the add button is visible (public preview ingress)",
+      "name": "work-tab-add-button-visible-preview",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Re-ran the same flow against https://daily-loop-8--68ipsq2d.preview.emergentagent.com at 390px: nav-logo -> nav-work -> job-add-button visible."
+    },
+    {
+      "criterion": "Add a job with an hourly rate and a 2-week rota",
+      "name": "cara-adds-job-with-two-week-rota",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "As Cara on /work: added 'tscheck-Shop' rate 10, 2-week rota, Mon 09:00-17:00 week1 + Wed week2; jobs-list shows 'tscheck-Shop' and '£10/h'; work-upcoming-card (Next two weeks) renders. Re-run twice more after fixing the fixture's own delete-before-recreate race (needed an explicit wait for the first jobs-list fetch to settle) — passes repeatedly without residue blocking re-runs."
+    },
+    {
+      "criterion": "Add a job with an hourly rate and a 2-week rota (API)",
+      "name": "test_tscheck_work_rota_jobs.py::test_free_tier_allows_one_job_then_402",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "POST /api/jobs as Alice (tok_t_a, 0 jobs) with rate 10 -> 200/201 with id and hourlyRate==10; second POST /api/jobs -> 402. Fixture job deleted via DELETE /api/jobs/{id} in a finally block."
+    },
+    {
+      "criterion": "Stats/Work show estimated earnings",
+      "name": "bob-work-stats-earnings",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "As Bob on /work and /stats: stats-work-hours-card shows stats-work-week-<jobId>='16h', stats-work-week-pay-<jobId>='£200.00', stats-work-month-<jobId>='72h', stats-work-month-pay-<jobId>='£900.00' for job 'Cafe' on both pages."
+    },
+    {
+      "criterion": "Stats/Work show estimated earnings (API)",
+      "name": "test_tscheck_work_rota_jobs.py::test_stats_work_shows_bob_week_and_month_earnings",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "GET /api/stats/work as Bob (tok_t_b) -> 200; jobs[] entry for 'Cafe': weekHours=16.0, weekPay=200.0, monthHours=72.0, monthPay=900.0."
+    },
+    {
+      "criterion": "Free tier limited to 1 job",
+      "name": "bob-free-tier-paywall",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "As Bob (1 existing job 'Cafe') on /work: job-add-button reads 'Add another job (Premium)'; clicking it opens the 'PUA Premium' paywall dialog, not the job editor."
+    },
+    {
+      "criterion": "Logo is a dropdown for all tabs; top bar only has logo, dark-mode toggle, Google account and settings",
+      "name": "logo-dropdown-nav-works",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "At 390px and 1280px: no individual nav-calendar link in the header (count 0) until nav-logo is clicked; nav-menu then lists all 10 items (overview/today/calendar/habits/planner/health/sharing/anniversaries/work/stats); clicking nav-habits and nav-stats navigates and updates nav-current label ('Habits', 'Stats'); nav-settings, theme toggle and account button remain in the header throughout."
+    },
+    {
+      "criterion": "Hawaiian jungle background",
+      "name": "jungle-background-visible",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "jungle-scene visible on Today page in light mode; after the theme toggle, jungle-scene remains visible in dark mode with page text still legible (screenshots confirm readable headings/body text over the dimmed jungle backdrop in both modes)."
+    }
+  ],
+  "notes": [
+    "All 6 acceptance-matrix criteria from this briefing are covered 1:1 (plus the preview-URL duplicate of the first), matching the 'no more than 8' guidance.",
+    "Fixture discipline: the only state-changing browser check (cara-adds-job-with-two-week-rota) creates/cleans up only its own 'tscheck-Shop' job for Cara; Bob's and Alice's seeded data were never touched. The backend free-tier test creates and deletes its own 'tscheck-shop-job'/'tscheck-second-job' (the latter is rejected with 402 and never persisted) for Alice."
+  ]
+}

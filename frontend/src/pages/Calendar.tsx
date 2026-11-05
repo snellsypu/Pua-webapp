@@ -138,8 +138,8 @@ export default function Calendar() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="font-heading text-3xl font-bold tracking-tight">{format(month, "MMMM yyyy")}</h1>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" data-testid="calendar-work-rota-button" onClick={() => setRotaOpen(true)}>
-            <Briefcase className="size-4" /> Work rota
+          <Button variant="outline" size="sm" data-testid="calendar-work-rota-button" onClick={() => setRotaOpen(true)} aria-label="Work rota">
+            <Briefcase className="size-4" /> <span className="hidden sm:inline">Work rota</span>
           </Button>
           <Button variant="outline" size="icon-sm" data-testid="calendar-prev-month" aria-label="Previous month" onClick={() => setMonth(addMonths(month, -1))}>
             <ChevronLeft className="size-4" />

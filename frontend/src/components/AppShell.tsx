@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import { JungleBackdrop, VineGarland } from "@/components/Jungle";
 import { PaywallProvider } from "@/components/Paywall";
 import { LeiCelebration } from "@/components/LeiCelebration";
-import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
+import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { MotionConfig } from "motion/react";
 import {
@@ -14,12 +14,15 @@ import {
   Sunrise,
   Flower2,
   BarChart3,
+  Briefcase,
   CalendarHeart,
+  ChevronDown,
   SunMedium,
   UtensilsCrossed,
 } from "lucide-react";
 import { Toaster } from "@/components/ui/sonner";
 import { buttonVariants } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { AccountButton } from "@/components/AccountButton";
@@ -29,7 +32,7 @@ import { markRead, readOnOpen } from "@/components/WakeBanner";
 import { useDayPart } from "@/lib/useDayPart";
 import { apiGet } from "@/lib/api";
 import type { AppSettings } from "@/lib/types";
-import { PuaLogo } from "@/components/Flower";
+import { Flower, PuaLogo } from "@/components/Flower";
 
 const NAV = [
   { to: "/", label: "Today", icon: SunMedium, testid: "nav-today" },
@@ -39,8 +42,50 @@ const NAV = [
   { to: "/health", label: "Health", icon: HeartPulse, testid: "nav-health" },
   { to: "/sharing", label: "Bouquets", icon: Flower2, testid: "nav-sharing" },
   { to: "/anniversaries", label: "Anniversaries", icon: CalendarHeart, testid: "nav-anniversaries" },
+  { to: "/work", label: "Work", icon: Briefcase, testid: "nav-work" },
   { to: "/stats", label: "Stats", icon: BarChart3, testid: "nav-stats" },
 ];
+
+/** The orchid logo is the menu: every tab lives in this dropdown to keep the top bar clear. */
+function LogoMenu({ evening }: { evening: boolean }) {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const items = [
+    { to: "/overview", label: evening ? "Tomorrow's review" : "Today's briefing", icon: evening ? MoonStar : Sunrise, testid: "nav-overview" },
+    ...NAV,
+  ];
+  const active = (to: string) => (to === "/" ? location.pathname === "/" : location.pathname.startsWith(to));
+  const current = items.find((i) => active(i.to));
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        className="group flex items-center gap-2 rounded-xl px-1.5 py-1 font-heading outline-none transition-[background-color] duration-150 hover:bg-emerald-500/10 focus-visible:ring-2 focus-visible:ring-ring data-[popup-open]:bg-emerald-500/15"
+        data-testid="nav-logo"
+        aria-label="Open menu"
+      >
+        <PuaLogo />
+        <span className="flex flex-col items-start leading-tight">
+          <span className="text-sm font-semibold" data-testid="nav-current">{current?.label ?? "Menu"}</span>
+          <span className="hidden text-[10px] font-medium text-muted-foreground sm:block">Personal Uplink Assistant</span>
+        </span>
+        <ChevronDown className="size-4 text-muted-foreground transition-transform duration-200 group-data-[popup-open]:rotate-180" />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" sideOffset={8} className="w-60 border-emerald-700/20 bg-popover/95 p-1.5 backdrop-blur-md" data-testid="nav-menu">
+        {items.map(({ to, label, icon: Icon, testid }) => (
+          <DropdownMenuItem
+            key={to}
+            onClick={() => navigate(to)}
+            data-testid={testid}
+            className={cn("gap-3 rounded-lg px-2.5 py-2 text-sm", active(to) && "bg-emerald-500/15 font-semibold text-emerald-900 dark:text-emerald-100")}
+          >
+            <Icon className="size-4" /> {label}
+            {active(to) && <Flower kind="hibiscus" className="ml-auto size-4" />}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
 
 export default function AppShell() {
   const daypart = useDayPart();
@@ -75,47 +120,8 @@ export default function AppShell() {
       <div className="relative z-10 min-h-svh">
         <header className="sticky top-0 z-40 border-b border-emerald-700/20 bg-background/80 backdrop-blur-md">
           <div className="mx-auto flex h-14 w-full max-w-6xl items-center gap-1 px-4">
-            <Link
-              to="/"
-              className="mr-3 flex items-center gap-2 font-heading text-base font-bold tracking-tight"
-              data-testid="nav-logo"
-            >
-              <PuaLogo />
-              <span className="hidden max-w-20 text-[10px] font-medium leading-tight tracking-normal text-muted-foreground lg:inline">
-                Personal Uplink Assistant
-              </span>
-            </Link>
-            <nav className="flex items-center gap-1">
-              {NAV.map(({ to, label, icon: Icon, testid }) => (
-                <NavLink
-                  key={to}
-                  to={to}
-                  end={to === "/"}
-                  data-testid={testid}
-                  className={({ isActive }) =>
-                    cn(
-                      buttonVariants({ variant: isActive ? "secondary" : "ghost", size: "sm" }),
-                      "px-2 sm:px-3",
-                    )
-                  }
-                >
-                  <Icon className="size-4" />
-                  <span className="hidden md:inline">{label}</span>
-                </NavLink>
-              ))}
-            </nav>
+            <LogoMenu evening={evening} />
             <div className="ml-auto flex items-center gap-1">
-              <NavLink
-                to="/overview"
-                data-testid="nav-overview"
-                title={evening ? "Tomorrow's review" : "Today's briefing"}
-                aria-label={evening ? "Tomorrow's review" : "Today's briefing"}
-                className={({ isActive }) =>
-                  cn(buttonVariants({ variant: isActive ? "secondary" : "ghost", size: "icon-sm" }))
-                }
-              >
-                {evening ? <MoonStar className="size-4" /> : <Sunrise className="size-4" />}
-              </NavLink>
               <ThemeToggle />
               <AccountButton />
               <NavLink

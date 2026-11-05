@@ -27,6 +27,7 @@ class JobIn(BaseModel):
     name: str = Field(min_length=1, max_length=40)
     rotaWeeks: int = Field(default=1, ge=1, le=4)
     startDate: str  # any day in week 1 of the rota (snapped to its Monday)
+    hourlyRate: float | None = Field(default=None, ge=0, le=1000)  # £ per hour, for estimated pay
     shifts: list[Shift] = Field(default_factory=list, max_length=28)
 
     @field_validator("startDate")

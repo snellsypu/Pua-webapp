@@ -191,3 +191,21 @@
   z-index: -1;
 }
 .dark [data-slot="card"]::after { opacity: 0.28; }
+
+/* jungle backdrop: drifting petals / fireflies and a slow sunbeam */
+@keyframes pua-petal-fall {
+  0% { transform: translate3d(0, 0, 0) rotate(0deg); opacity: 0; }
+  10% { opacity: 1; }
+  50% { transform: translate3d(var(--sway, 30px), 55vh, 0) rotate(180deg); }
+  90% { opacity: 0.9; }
+  100% { transform: translate3d(0, 112vh, 0) rotate(360deg); opacity: 0; }
+}
+.pua-petal { animation: pua-petal-fall 22s linear infinite; will-change: transform; }
+@keyframes pua-sunbeam {
+  0%, 100% { opacity: 0.35; transform: translateX(0) rotate(18deg); }
+  50% { opacity: 0.75; transform: translateX(6vw) rotate(14deg); }
+}
+.pua-sunbeam { animation: pua-sunbeam 14s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .pua-petal, .pua-sunbeam { animation: none; opacity: 0; }
+}

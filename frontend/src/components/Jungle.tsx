@@ -105,7 +105,20 @@ function Vine({ className, flip, length = 640, seed = 0 }: { className?: string;
 /** Fixed jungle frame behind the app: vines down both edges, leaves in the bottom corners. */
 export function JungleBackdrop() {
   return (
-    <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden opacity-60 dark:opacity-35" aria-hidden="true" data-testid="jungle-backdrop">
+    <>
+    {/* painted Hawaiian rainforest (day / night), washed out in the middle so cards stay readable */}
+    <div className="pointer-events-none fixed inset-0 z-0" aria-hidden="true" data-testid="jungle-scene">
+      <div className="absolute inset-0 bg-[url('/jungle-day.webp')] bg-cover bg-center opacity-70 dark:hidden" />
+      <div className="absolute inset-0 hidden bg-[url('/jungle-night.webp')] bg-cover bg-center opacity-80 dark:block" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_65%_55%_at_50%_40%,color-mix(in_oklab,var(--background)_80%,transparent)_25%,color-mix(in_oklab,var(--background)_40%,transparent)_70%,transparent_100%)]" />
+      <div className="pua-sunbeam absolute -top-1/4 left-1/4 h-[150%] w-40 rotate-[18deg] bg-gradient-to-b from-amber-100/40 via-amber-50/10 to-transparent blur-2xl dark:from-sky-200/10" />
+      {PETALS.map((p, i) => (
+        <span key={i} className="pua-petal absolute top-[-6%] block" style={{ left: p.left, animationDelay: p.delay, animationDuration: p.dur, ["--sway" as string]: p.sway }}>
+          {p.kind === "orchid" ? <Orchid className="size-4 opacity-80" /> : <span className="block size-2.5 rounded-full bg-pink-300/80 shadow-[0_0_8px_rgb(244_114_182/0.6)] dark:bg-amber-200/80 dark:shadow-[0_0_10px_rgb(253_230_138/0.8)]" />}
+        </span>
+      ))}
+    </div>
+    <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden opacity-50 dark:opacity-30" aria-hidden="true" data-testid="jungle-backdrop">
       <Vine className="absolute -left-2 top-12 w-12 sm:w-16" length={720} seed={0} />
       <Vine className="absolute -left-1 top-0 hidden w-10 opacity-70 lg:block" length={380} seed={2} />
       <Vine className="absolute -right-2 top-12 w-12 sm:w-16" flip length={620} seed={1.5} />
@@ -115,8 +128,19 @@ export function JungleBackdrop() {
       <Leaf className="absolute bottom-10 -left-10 size-32 rotate-[-30deg] opacity-70" tone="deep" />
       <Leaf className="absolute -bottom-8 right-40 hidden size-28 rotate-[70deg] opacity-60 md:block" tone="light" />
     </div>
+    </>
   );
 }
+
+// drifting petals by day / fireflies by night
+const PETALS = [
+  { left: "8%", delay: "0s", dur: "19s", sway: "40px", kind: "orchid" },
+  { left: "22%", delay: "6s", dur: "24s", sway: "-30px", kind: "dot" },
+  { left: "41%", delay: "11s", dur: "21s", sway: "50px", kind: "dot" },
+  { left: "63%", delay: "3s", dur: "26s", sway: "-45px", kind: "orchid" },
+  { left: "79%", delay: "9s", dur: "22s", sway: "35px", kind: "dot" },
+  { left: "92%", delay: "15s", dur: "25s", sway: "-25px", kind: "dot" },
+];
 
 /** A leafy garland strip for under the header. */
 export function VineGarland({ className }: { className?: string }) {

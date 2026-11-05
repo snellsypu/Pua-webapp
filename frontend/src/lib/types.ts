@@ -702,6 +702,7 @@ export interface JobIn {
   name: string;
   rotaWeeks: number; // 1–4
   startDate: string; // a day in week 1 (snapped to Monday)
+  hourlyRate: number | null; // £ per hour, for estimated pay
   shifts: Shift[];
 }
 export interface Job extends JobIn {
@@ -725,10 +726,15 @@ export interface JobHours {
   weekShifts: number;
   monthHours: number;
   monthShifts: number;
+  hourlyRate: number | null;
+  weekPay: number | null; // estimated
+  monthPay: number | null;
 }
 export interface WorkHours {
   weekStart: string;
   weekEnd: string;
   month: string; // YYYY-MM
   jobs: JobHours[];
+  weekPay: number | null; // all jobs with a rate
+  monthPay: number | null;
 }

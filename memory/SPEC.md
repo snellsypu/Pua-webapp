@@ -476,3 +476,15 @@ Gift ideas have a 🛒 button in the event dialog → POST /api/shopping.
 - Gift pool chip-in: gift_pool.chipIns [{user_id, name, amount}]; PUT /…/pool/{gid}/chip-in {amount>0}
   (sets/changes), DELETE same (leave). PoolGift.chipIns/chipTotal; heads-up adds
   "X (you're chipping in £N)".
+
+## Work tab, earnings, logo menu, painted backdrop
+- /work (pages/Work.tsx): WorkRotaManager (jobs list + JobEditor, shared with the calendar's
+  WorkRotaDialog), WorkHoursCard (also on Stats) and the next two weeks of shifts.
+- Job.hourlyRate (£/h, optional, ≥0). GET /api/stats/work adds hourlyRate, weekPay, monthPay per job
+  and weekPay/monthPay totals (estimates = rota hours × rate).
+- Navigation: the header is just the orchid logo menu (LogoMenu dropdown: briefing/review, Today,
+  Calendar, Habits, Planner, Health, Bouquets, Anniversaries, Work, Stats; shows the current tab name),
+  ThemeToggle, AccountButton, Settings.
+- Backdrop: painted Hawaiian rainforest /jungle-day.webp and /jungle-night.webp (dark mode) with a
+  centre wash for readability, slow sunbeam + drifting orchid petals/fireflies (pua-petal,
+  pua-sunbeam keyframes; off with reduced motion), plus the SVG vines/leaves.
