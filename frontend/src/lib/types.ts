@@ -434,6 +434,7 @@ export interface JoinedPlanner extends Person {
   bouquets: string[]; // names of their bouquets you're in (joined order)
   bouquetIds: string[]; // same order — the first one's flower colours them on your calendar
   color: FlowerKind | null; // your own calendar colour pick
+  canLeave: boolean; // they own a bouquet you joined
 }
 
 // A group you share with — its own code and its own choice of what's shared
@@ -447,10 +448,24 @@ export interface Bouquet {
   paused: boolean; // past the 2 free bouquets without Premium
 }
 
+export interface Membership {
+  bouquetId: string;
+  bouquetName: string;
+  ownerName: string;
+  categories: ShareCategory[];
+  shoppingEdit: boolean;
+  paused: boolean;
+}
+export interface MembershipUpdate {
+  categories?: ShareCategory[];
+  shoppingEdit?: boolean;
+}
+
 export interface SharingState {
   bouquets: Bouquet[];
   joined: JoinedPlanner[];
   joinedOwnerId: string | null; // set by POST /sharing/join
+  memberships: Membership[]; // bouquets you joined + what YOU share in each
 }
 
 export type FlowerKind = "plumeria" | "pink-plumeria" | "hibiscus" | "ilima" | "lehua";
@@ -643,6 +658,7 @@ export interface UpcomingEvent {
   custom: Anniversary | null;
   friend: string | null; // user_id when it's a bouquet friend's shared birthday
   milestone: string | null; // "18th", "Big 40", "Silver"…
+  gifts: GiftIdea[]; // your private gift ideas for a bouquet friend's birthday
 }
 export interface HolidaySetState {
   id: string;

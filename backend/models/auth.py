@@ -42,6 +42,7 @@ class JoinedPlanner(Person):
     bouquets: list[str]  # names of their bouquets you're in (joined order)
     bouquetIds: list[str]  # same order — the first one's flower colours them on your calendar
     color: FlowerKind | None = None  # your own pick for their calendar colour
+    canLeave: bool = False  # they own a bouquet you joined (leaving drops those memberships)
 
 
 class Bouquet(BaseModel):
@@ -55,9 +56,25 @@ class Bouquet(BaseModel):
     paused: bool = False  # past the 2 free bouquets without Premium: members can't see it
 
 
+class Membership(BaseModel):
+    """A bouquet you joined, and what YOU share with everyone in it."""
+    bouquetId: str
+    bouquetName: str
+    ownerName: str
+    categories: list[ShareCategory] = Field(default_factory=list)
+    shoppingEdit: bool = True
+    paused: bool = False
+
+
+class MembershipUpdate(BaseModel):
+    categories: list[ShareCategory] | None = Field(default=None, max_length=6)
+    shoppingEdit: bool | None = None
+
+
 class SharingState(BaseModel):
     bouquets: list[Bouquet]  # your bouquets (you're the admin)
-    joined: list[JoinedPlanner]  # planners you can view
+    joined: list[JoinedPlanner]  # everyone in your bouquets and what they share with you
+    memberships: list[Membership] = Field(default_factory=list)  # bouquets you joined + what you share
     joinedOwnerId: str | None = None  # set by POST /join — whose planner you just joined
 
 

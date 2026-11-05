@@ -426,3 +426,20 @@ Gift ideas have a 🛒 button in the event dialog → POST /api/shopping.
 - Meal.cooks [{user_id, name}] (several can help): POST /api/meals/{id}/cook and
   /api/sharing/planner/{owner}/meals/{id}/cook toggle me. Meal dialog "I'll cook / I'll help /
   Step back"; week cells + Today slots show 👩‍🍳 names. Upserts keep cooks.
+
+## Mutual bouquet sharing (supersedes "owner-only" sharing above)
+- Everyone in a bouquet shares with everyone else in it. Owner shares bouquet.categories /
+  shoppingEdit; each MEMBER shares their own choice stored on bouquet_members {categories,
+  shoppingEdit} (default nothing). PUT /api/sharing/memberships/{bid} {categories?, shoppingEdit?}.
+- sharing.shared_bouquets(sharer, viewer) / _access / co_members(uid) are the single source of
+  truth (paused bouquets share nothing either way). Shared planner page, friends calendar overlay,
+  joining appointments, shared shopping edits, shared meal plans, bouquet notes and friend
+  birthdays all work for any co-member, not just the owner.
+- SharingState.joined = everyone in your bouquets (+ canLeave when they own one you joined);
+  SharingState.memberships = bouquets you joined + what you share. Sharing page: "People in your
+  bouquets" + "What you share in bouquets you joined" chooser.
+- Friend birthdays: UpcomingEvent.gifts = your PRIVATE gift list for that friend (scoped
+  `friend_gifts` {friendId, gifts}); PUT /api/anniversaries/friends/{friendId}/gifts {gifts}
+  (404 if their birthday isn't shared with you). 🎁 button on friend cards opens the list; gifts
+  feed the 1-week/1-day heads-ups like your own. My-birthday saves merge into the latest value
+  and show "Not shared yet" until the share box is ticked.

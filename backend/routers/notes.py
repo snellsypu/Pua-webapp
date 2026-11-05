@@ -27,13 +27,12 @@ def _out(n: dict, me: str, owner_id: str) -> AppointmentNote:
 
 
 async def _note_bouquets(owner_id: str, viewer_id: str | None) -> list[dict]:
-    """Owner's active bouquets that share appointments (only the viewer's, if given)."""
-    q: dict = {"ownerId": owner_id, "categories": "appointments"}
+    """Active bouquets where owner_id shares appointments (only those shared with the viewer, if given)."""
+    from routers.sharing import _my_bouquets, _shares_in, shared_bouquets
+
     if viewer_id:
-        q["id"] = {"$in": [m["bouquetId"] async for m in
-                           raw_db.bouquet_members.find({"ownerId": owner_id, "viewerId": viewer_id})]}
-    paused = await paused_ids(owner_id)
-    return [b async for b in raw_db.bouquets.find(q).sort("createdAt", 1) if b["id"] not in paused]
+        return [b for b, cats, _ in await shared_bouquets(owner_id, viewer_id) if "appointments" in cats]
+    return [b for b, m in await _my_bouquets(owner_id) if "appointments" in _shares_in(b, m)[0]]
 
 
 async def viewer_notes(owner_id: str, viewer_id: str, appt_ids: list[str]) -> tuple[list[AppointmentNote], list[BouquetRef]]:

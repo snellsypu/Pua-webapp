@@ -1,0 +1,107 @@
+{
+  "iteration": 3,
+  "mode": "generate",
+  "passed": 12,
+  "failed": 1,
+  "summary": "8 acceptance criteria for 'Mutual bouquet sharing' covered by 9 browser checks (one re-run on the required public preview URL) + 3 backend API tests in a new test file. 1 real frontend bug found: the Anniversaries page never surfaces a bouquet friend's birth year ('Turns N') next to 'Bouquet friend', even though the backend computes and returns it (years:36 confirmed via curl) and the friend-gift dialog header does show it correctly. All other 7 criteria passed, including cleanup verified by API (seed gift list Candle/Book restored after adding+removing 'Scarf').",
+  "bugs": [
+    {
+      "criterion": "Bouquet owner's shared birthday appears for members",
+      "severity": "medium",
+      "description": "On /anniversaries, a bouquet friend's birthday card/hero only ever shows 'Bouquet friend' as its sub-label and never 'Turns N', even though the API returns years correctly and the friend-gift dialog header ('Thu, Nov 12 · turns 36 — only you can see this gift list.') proves the data is available client-side. Root cause: frontend/src/pages/Anniversaries.tsx `subLabel()` returns 'Bouquet friend' unconditionally for e.friend and never appends the computed e.years, so the 'turns 36' text required by the acceptance criterion is never rendered anywhere in the main list or hero card.",
+      "evidence": "Browser check 'bob-sees-alice-birthday-anniversaries' (2 consecutive runs, same result): rendered text was '🎈\\nAlice's birthday\\nThu, Nov 12 · Bouquet friend\\nCandle\\n7 days' (no 'turns 36'). Cross-check: GET /api/anniversaries with tok_t_b returns {\"id\":\"friend:t_a\",...,\"years\":36,...} confirming the backend computes and sends the age — this is a frontend-only display bug, not a data bug."
+    }
+  ],
+  "action_items": [
+    {
+      "type": "pre_existing_test_error",
+      "severity": "low",
+      "detail": "Carried over from iteration 2, unrelated to this task: tests/test_tscheck_access_management.py and tests/test_tscheck_removed_user_access.py still fail/error (1 failed, 4 errors) because they target an older 'owner/access-list' auth model that no longer exists in the current app. Still flagging for the main agent to delete or rewrite these stale files."
+    }
+  ],
+  "retest_needed": true,
+  "checks": [
+    {
+      "criterion": "Members (not just the owner) choose what they share with everyone in a bouquet they joined",
+      "name": "cara-chooser-shares-habits",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "As Cara on /sharing, memberships-card chooser's Habits checkbox ticked, toast 'Family updated' shown, aria-checked=true after full page reload."
+    },
+    {
+      "criterion": "What a member shares is visible to every other bouquet member, including the owner",
+      "name": "alice-sees-bob-shared-categories",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "As Alice, joined-t_b shows 'Appointments · Shopping list'; /shared/t_b shows 'Bob gig'. As Cara (cookie-swapped), /shared/t_b also shows 'Bob gig'."
+    },
+    {
+      "criterion": "What a member shares is visible to every other bouquet member, including the owner (API: calendar overlay + shared planner)",
+      "name": "test_tscheck_mutual_bouquet_sharing.py::test_friends_calendar_overlay_includes_bob_appointment / test_shared_planner_shows_bob_appointment_for_alice_and_cara",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "GET /api/sharing/calendar?from=2026-11-01&to=2026-11-10 as Alice and Cara -> 200, Bob's entry includes appointment 'Bob gig' dated 2026-11-05; GET /api/sharing/planner/t_b as both -> 200, appointments list contains 'Bob gig'."
+    },
+    {
+      "criterion": "After Cara ticks a category, Bob (another member) sees it",
+      "name": "bob-sees-cara-habits-after-share",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "As Bob, /sharing joined-bouquets-t_c text contains 'Habits'; opening /shared/t_c shows the shared-habits section."
+    },
+    {
+      "criterion": "Bouquet owner's shared birthday appears for members",
+      "name": "bob-sees-alice-birthday-anniversaries",
+      "lane": "browser",
+      "status": "failed",
+      "evidence": "As Bob, /anniversaries shows Alice's birthday card with '🎈 ... Bouquet friend ... 7 days' but never 'turns 36', though GET /api/anniversaries confirms years:36 is returned by the API. See bugs[]."
+    },
+    {
+      "criterion": "Gift list works for bouquet friends' birthdays",
+      "name": "bob-manages-alice-gift-list",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "friend-gift-dialog for Alice showed existing Candle (unbought) and Book (bought); added 'Scarf', persisted after full page reload; dialog header itself showed 'turns 36'; cleanup removed Scarf and GET /api/anniversaries (Bob) afterward confirmed only Candle+Book remain."
+    },
+    {
+      "criterion": "Gift list works for bouquet friends' birthdays (API: private per viewer)",
+      "name": "test_tscheck_mutual_bouquet_sharing.py::test_friend_gift_list_is_private_per_viewer",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "PUT /api/anniversaries/friends/t_a/gifts as Bob with a 'tscheck-private-gift-marker' gift -> 200; GET /api/anniversaries as Cara shows friend:t_a with gifts NOT containing the marker (Cara's own private list is empty); Bob's list restored to original Candle/Book afterward (verified by response body)."
+    },
+    {
+      "criterion": "Friend gift ideas appear in the heads-up",
+      "name": "bob-today-headsup-shows-alice-gift",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "As Bob, Home 'Coming up' card (anniversary-heads-up) shows heads-up-friend:t_a containing 'Alice' and 'In 1 week'; heads-up-gifts-friend:t_a contains 'Candle'."
+    },
+    {
+      "criterion": "Own birthday settings save reliably",
+      "name": "cara-settings-birthday-save-persists",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "As Cara in Settings, picked day 20 / month May, typed year 1995, ticked 'Share with my bouquets' in quick succession; after a full page reload all three fields (20, May, 1995) and the share checkbox (aria-checked=true) persisted, and the 'Not shared yet' hint was absent."
+    },
+    {
+      "criterion": "Owner-only leave button",
+      "name": "leave-button-owner-only",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "As Bob on /sharing, joined-leave-t_a (Alice, owner) is visible; joined-leave-t_c (Cara, fellow member) has 0 count."
+    },
+    {
+      "criterion": "Owner-only leave button (public preview ingress)",
+      "name": "leave-button-owner-only-preview",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Same check re-run against https://daily-loop-8--68ipsq2d.preview.emergentagent.com/sharing with an injected secure cookie: joined-leave-t_a visible, joined-leave-t_c absent."
+    }
+  ],
+  "notes": [
+    "8 acceptance-matrix criteria covered by 9 browser checks (incl. 1 run both locally and on the required public preview URL) + 1 new backend test file (test_tscheck_mutual_bouquet_sharing.py, 3 tests) = 12 checks[] entries; 2 criteria had both UI and API surfaces so got both artifact kinds.",
+    "Fixture discipline: all mutations were made on the fixed seed accounts' OWN sub-resources that the matrix explicitly exercises (Cara's membership categories, Cara's own birthday, Bob's private friend_gifts list for Alice) and were either idempotent (membership categories, Cara's birthday) or explicitly restored to the original seeded value at the end of the check/test (Bob's gift list verified back to exactly Candle unbought + Book bought via API). No seeded appointment/bouquet/user row was deleted or renamed.",
+    "During authoring, two script-only issues were found and fixed (not app bugs): (1) the shadcn Select popup sometimes didn't auto-close when re-selecting an already-current value, so the day/month pickers were changed to pick a different value first then the target value; (2) a checkbox toggle in 'cara-settings-birthday-save-persists' flipped share back to false on a re-run because residue from an earlier failed attempt had already left it true — fixed by checking aria-checked before clicking."
+  ]
+}

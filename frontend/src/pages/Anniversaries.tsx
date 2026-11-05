@@ -1,6 +1,6 @@
 // Anniversaries tab: birthdays, anniversaries, your own yearly events and holiday sets,
 // each with a countdown. Heads-ups (1 week / 1 day / today) also go in the morning briefing.
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { motion } from "motion/react";
@@ -8,11 +8,11 @@ import { toast } from "sonner";
 import { CalendarHeart, Gift, Pencil, Plus, Settings2, ShoppingCart, Trash2, X } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { apiDelete, apiGet, apiPost, apiPut } from "@/lib/api";
-import type { Anniversary, AnniversaryIn, AnniversaryKind, UpcomingEvent } from "@/lib/types";
+import type { Anniversary, AnniversaryIn, AnniversaryKind, GiftIdea, UpcomingEvent } from "@/lib/types";
 import { fmtShort } from "@/lib/dates";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -29,7 +29,7 @@ export function eventLabel(e: UpcomingEvent) {
   return e.title;
 }
 const subLabel = (e: UpcomingEvent) =>
-  e.friend ? "Bouquet friend" : e.kind === "birthday" && e.years ? `Turns ${e.years}` : e.kind === "anniversary" && e.years ? `${e.years} years` : e.kind === "holiday" ? "Holiday" : e.custom ? KIND_LABEL[e.custom.kind] : "";
+  e.friend ? (e.years ? `Bouquet friend · turns ${e.years}` : "Bouquet friend") : e.kind === "birthday" && e.years ? `Turns ${e.years}` : e.kind === "anniversary" && e.years ? `${e.years} years` : e.kind === "holiday" ? "Holiday" : e.custom ? KIND_LABEL[e.custom.kind] : "";
 
 /** gold pill for decade birthdays, 18th/21st and named anniversaries (Silver, Ruby, Golden…) */
 export function MilestoneBadge({ e, className }: { e: UpcomingEvent; className?: string }) {
@@ -40,6 +40,59 @@ export function MilestoneBadge({ e, className }: { e: UpcomingEvent; className?:
       data-testid={`anniversary-milestone-${e.id}`}>
       ✨ {text}
     </span>
+  );
+}
+
+/** Your private gift list for a bouquet friend's shared birthday (saved as you go). */
+function FriendGiftDialog({ e, onClose }: { e: UpcomingEvent | null; onClose: () => void }) {
+  const qc = useQueryClient();
+  const [gifts, setGifts] = useState<GiftIdea[]>([]);
+  const [text, setText] = useState("");
+  useEffect(() => { setGifts(e?.gifts ?? []); setText(""); }, [e]);
+  const save = useMutation({
+    mutationFn: (g: GiftIdea[]) => apiPut<GiftIdea[]>(`/anniversaries/friends/${e!.friend}/gifts`, { gifts: g }),
+    onSuccess: (g) => { setGifts(g); qc.invalidateQueries({ queryKey: ["anniversaries"] }); },
+    onError: () => toast.error("Couldn't save the gift list"),
+  });
+  const toShopping = useMutation({
+    mutationFn: (name: string) => apiPost("/shopping", { name }),
+    onSuccess: (_, name) => { qc.invalidateQueries({ queryKey: ["shopping"] }); toast.success(`"${name}" added to the shopping list`); },
+    onError: () => toast.error("Could not add to the shopping list"),
+  });
+  const change = (g: GiftIdea[]) => { setGifts(g); save.mutate(g); };
+  const add = () => { const t = text.trim(); if (t) { change([...gifts, { id: crypto.randomUUID(), text: t, bought: false }]); setText(""); } };
+  return (
+    <Dialog open={!!e} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="sm:max-w-md" data-testid="friend-gift-dialog">
+        <DialogHeader>
+          <DialogTitle className="font-heading">🎈 {e ? eventLabel(e) : ""}</DialogTitle>
+          <DialogDescription>{e ? `${fmtShort(e.next)}${e.years ? ` · turns ${e.years}` : ""}` : ""} — only you can see this gift list.</DialogDescription>
+        </DialogHeader>
+        <ul className="grid gap-1.5" data-testid="friend-gift-list">
+          {gifts.map((g, i) => (
+            <li key={g.id ?? i} className="flex items-center gap-2 text-sm" data-testid={`friend-gift-${i}`}>
+              <Checkbox checked={g.bought} aria-label={`Bought ${g.text}`} data-testid={`friend-gift-bought-${i}`}
+                onCheckedChange={(v) => change(gifts.map((x, j) => (j === i ? { ...x, bought: v === true } : x)))} />
+              <span className={cn("flex-1", g.bought && "text-muted-foreground line-through")}>{g.text}</span>
+              {!g.bought && (
+                <button type="button" aria-label={`Add ${g.text} to shopping list`} onClick={() => toShopping.mutate(g.text)} disabled={toShopping.isPending}
+                  className="rounded p-0.5 text-muted-foreground transition-[color,transform] duration-150 hover:text-primary active:scale-90" data-testid={`friend-gift-to-shopping-${i}`}>
+                  <ShoppingCart className="size-3.5" />
+                </button>
+              )}
+              <button type="button" aria-label="Remove" onClick={() => change(gifts.filter((_, j) => j !== i))}
+                className="rounded p-0.5 text-muted-foreground hover:text-foreground" data-testid={`friend-gift-remove-${i}`}><X className="size-3.5" /></button>
+            </li>
+          ))}
+          {!gifts.length && <li className="text-sm text-muted-foreground">No gift ideas yet.</li>}
+        </ul>
+        <div className="flex gap-2">
+          <Input value={text} onChange={(ev) => setText(ev.target.value)} maxLength={80} placeholder="e.g. Silk scarf" className="h-8 text-sm"
+            onKeyDown={(ev) => { if (ev.key === "Enter") { ev.preventDefault(); add(); } }} data-testid="friend-gift-input" />
+          <Button type="button" size="sm" variant="outline" className="h-8" onClick={add} disabled={!text.trim()} data-testid="friend-gift-add"><Plus className="size-3.5" /> Add</Button>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -152,6 +205,7 @@ function EventDialog({ open, onOpenChange, initial }: { open: boolean; onOpenCha
 export default function Anniversaries() {
   const q = useUpcoming();
   const [filter, setFilter] = useState<Filter>("all");
+  const [friendGift, setFriendGift] = useState<UpcomingEvent | null>(null);
   const [dialog, setDialog] = useState<{ open: boolean; initial: Anniversary | null; key: number }>({ open: false, initial: null, key: 0 });
   const events = useMemo(() => (q.data ?? []).filter((e) => filter === "all" || (filter === "holiday" ? e.kind === "holiday" : e.kind !== "holiday")), [q.data, filter]);
   const [hero, ...rest] = events;
@@ -215,9 +269,9 @@ export default function Anniversaries() {
               <span className="block truncate text-sm font-medium">{eventLabel(e)}</span>
               <span className="block text-xs text-muted-foreground">{fmtShort(e.next)}{subLabel(e) ? ` · ${subLabel(e)}` : ""}</span>
               <MilestoneBadge e={e} className="mt-1" />
-              {!!e.custom?.gifts.filter((g) => !g.bought).length && (
+              {!!(e.custom?.gifts ?? e.gifts).filter((g) => !g.bought).length && (
                 <span className="mt-0.5 flex items-center gap-1 truncate text-[11px] text-pink-700 dark:text-pink-300" data-testid={`anniversary-gifts-${e.id}`}>
-                  <Gift className="size-3" /> {e.custom.gifts.filter((g) => !g.bought).map((g) => g.text).join(", ")}
+                  <Gift className="size-3" /> {(e.custom?.gifts ?? e.gifts).filter((g) => !g.bought).map((g) => g.text).join(", ")}
                 </span>
               )}
             </span>
@@ -228,12 +282,20 @@ export default function Anniversaries() {
               <button type="button" aria-label="Edit" onClick={() => open(e.custom)} data-testid={`anniversary-edit-${e.id}`}
                 className="rounded p-1 text-muted-foreground opacity-60 transition-opacity duration-150 hover:opacity-100"><Pencil className="size-3.5" /></button>
             )}
+            {e.friend && (
+              <button type="button" aria-label="Gift ideas" title="Gift ideas" onClick={() => setFriendGift(e)} data-testid={`anniversary-friend-gifts-${e.id}`}
+                className="rounded p-1 text-pink-600 opacity-80 transition-[opacity,transform] duration-150 hover:opacity-100 active:scale-90"><Gift className="size-4" /></button>
+            )}
           </li>
         ))}
       </ul>
       {hero?.custom && (
         <Button variant="ghost" size="sm" onClick={() => open(hero.custom)} data-testid="anniversary-next-edit"><Pencil className="size-3.5" /> Edit {hero.title}</Button>
       )}
+      {hero?.friend && (
+        <Button variant="ghost" size="sm" onClick={() => setFriendGift(hero)} data-testid="anniversary-next-gifts"><Gift className="size-3.5" /> Gift ideas for {hero.title}</Button>
+      )}
+      <FriendGiftDialog e={friendGift} onClose={() => setFriendGift(null)} />
       <EventDialog key={dialog.key} open={dialog.open} initial={dialog.initial} onOpenChange={(o) => setDialog((d) => ({ ...d, open: o }))} />
     </div>
   );

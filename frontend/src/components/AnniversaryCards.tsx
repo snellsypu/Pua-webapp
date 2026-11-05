@@ -19,7 +19,12 @@ export function MyBirthdayCard() {
   const qc = useQueryClient();
   const q = useQuery({ queryKey: ["my-birthday"], queryFn: () => apiGet<MyBirthday>("/anniversaries/my-birthday") });
   const save = useMutation({
-    mutationFn: (b: MyBirthday) => apiPut<MyBirthday>("/anniversaries/my-birthday", b),
+    mutationFn: (patch: Partial<MyBirthday>) => {
+      const latest = qc.getQueryData<MyBirthday>(["my-birthday"]) ?? { date: null, year: null, share: false };
+      const next = { ...latest, ...patch };
+      qc.setQueryData(["my-birthday"], next); // optimistic, so the next edit builds on this one
+      return apiPut<MyBirthday>("/anniversaries/my-birthday", next);
+    },
     onSuccess: (b) => { qc.setQueryData(["my-birthday"], b); toast.success(b.share && b.date ? "Birthday saved — your bouquets will see it" : "Birthday saved"); },
     onError: () => toast.error("Couldn't save your birthday"),
   });
@@ -27,7 +32,7 @@ export function MyBirthdayCard() {
   const [yearText, setYearText] = useState<string | null>(null);
   const shownYear = yearText ?? (b.year ? String(b.year) : "");
   const [m, d] = b.date ? b.date.split("-").map(Number) : [0, 0];
-  const setMD = (mm: number, dd: number) => save.mutate({ ...b, date: `${String(mm).padStart(2, "0")}-${String(Math.min(dd, new Date(2024, mm, 0).getDate())).padStart(2, "0")}` });
+  const setMD = (mm: number, dd: number) => save.mutate({ date: `${String(mm).padStart(2, "0")}-${String(Math.min(dd, new Date(2024, mm, 0).getDate())).padStart(2, "0")}` });
   return (
     <Card data-testid="my-birthday-card">
       <CardHeader>
@@ -48,14 +53,17 @@ export function MyBirthdayCard() {
           onChange={(e) => {
             const y = e.target.value.replace(/\D/g, "").slice(0, 4);
             setYearText(y);
-            if (y.length === 4 && Number(y) >= 1900 && Number(y) !== b.year) save.mutate({ ...b, year: Number(y) });
-            if (!y && b.year) save.mutate({ ...b, year: null });
+            if (y.length === 4 && Number(y) >= 1900 && Number(y) !== b.year) save.mutate({ year: Number(y) });
+            if (!y && b.year) save.mutate({ year: null });
           }}
           data-testid="my-birthday-year" />
         <label htmlFor="my-birthday-share" className="flex items-center gap-2.5 text-sm">
-          <Checkbox id="my-birthday-share" checked={b.share} disabled={!b.date || save.isPending} onCheckedChange={(v) => save.mutate({ ...b, share: v === true })} data-testid="my-birthday-share" />
+          <Checkbox id="my-birthday-share" checked={b.share} disabled={!b.date} onCheckedChange={(v) => save.mutate({ share: v === true })} data-testid="my-birthday-share" />
           Share with my bouquets
         </label>
+        {b.date && !b.share && (
+          <p className="w-full text-xs text-amber-700 dark:text-amber-300" data-testid="my-birthday-not-shared">Not shared yet — tick the box so your bouquets see it in their Anniversaries.</p>
+        )}
       </CardContent>
     </Card>
   );
@@ -79,9 +87,9 @@ export function AnniversaryHeadsUp({ className }: { className?: string }) {
               <span className="font-medium">{e.kind === "birthday" ? (e.years ? `${e.title} turns ${e.years}` : `${e.title}'s birthday`) : e.kind === "anniversary" && e.years ? `${e.title} · ${e.years} years` : e.title}</span>
               {e.milestone && <span className="rounded-full bg-amber-300 px-1.5 text-[10px] font-bold text-amber-950" data-testid={`heads-up-milestone-${e.id}`}>✨ {e.milestone}</span>}
               <span className="text-xs text-muted-foreground">{when(e.daysUntil)}</span>
-              {e.daysUntil > 0 && !!e.custom?.gifts.filter((g) => !g.bought).length && (
+              {e.daysUntil > 0 && !!(e.custom?.gifts ?? e.gifts).filter((g) => !g.bought).length && (
                 <span className="text-xs text-pink-700 dark:text-pink-300" data-testid={`heads-up-gifts-${e.id}`}>
-                  🎁 {e.custom.gifts.filter((g) => !g.bought).map((g) => g.text).join(", ")}
+                  🎁 {(e.custom?.gifts ?? e.gifts).filter((g) => !g.bought).map((g) => g.text).join(", ")}
                 </span>
               )}
             </li>

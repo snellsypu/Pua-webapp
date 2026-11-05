@@ -2,8 +2,9 @@
 
 Each bouquet (owned by its admin = the planner owner) has its own join code and its own
 categories. Entering a code adds you to that bouquet (`bouquet_members`); joining another
-bouquet never removes you from the first. What a viewer may see of a planner is the union
-of the categories of every bouquet of that owner they're in. Viewing is read-only except
+bouquet never removes you from the first. Sharing is mutual: the owner shares the bouquet's
+categories, and every member shares their own choice (stored on their membership) with
+everyone else in it. What X sees of Y is the union over every bouquet they're both in. Viewing is read-only except
 the shopping list, when a bouquet that shares it allows edits. Private appointments are
 masked as "Unavailable".
 """
@@ -18,7 +19,8 @@ from lib.dates import today_iso
 from lib.db import current_owner, raw_db
 from models.auth import (
     Leaderboard, LeaderboardEntry,
-    Bouquet, BouquetCreate, BouquetUpdate, FriendColorIn, JoinedPlanner, JoinIn, Person, SharingState,
+    Bouquet, BouquetCreate, BouquetUpdate, FriendColorIn, JoinedPlanner, JoinIn, Membership, MembershipUpdate,
+    Person, SharingState,
 )
 from models.planner import (Appointment, FavouriteMeal, Meal, MealUpsert, Recipe, ShoppingCreate, ShoppingItem,
                             ShoppingSuggestion, ShoppingUpdate)
@@ -54,19 +56,57 @@ async def _unique_code() -> str:
             return code
 
 
+async def _my_bouquets(uid: str) -> list[tuple[dict, dict | None]]:
+    """Active bouquets uid is in: (bouquet, None) when they own it, (bouquet, membership) otherwise."""
+    out: list[tuple[dict, dict | None]] = []
+    paused = await paused_ids(uid)
+    async for b in raw_db.bouquets.find({"ownerId": uid}).sort("createdAt", 1):
+        if b["id"] not in paused:
+            out.append((b, None))
+    members = {m["bouquetId"]: m async for m in raw_db.bouquet_members.find({"viewerId": uid})}
+    paused_by: dict[str, set[str]] = {}
+    async for b in raw_db.bouquets.find({"id": {"$in": list(members)}}).sort("createdAt", 1):
+        if b["ownerId"] not in paused_by:
+            paused_by[b["ownerId"]] = await paused_ids(b["ownerId"])
+        if b["id"] not in paused_by[b["ownerId"]]:
+            out.append((b, members[b["id"]]))
+    return out
+
+
+def _shares_in(b: dict, m: dict | None) -> tuple[set[str], bool]:
+    """What someone shares in a bouquet: the owner's bouquet settings, or a member's own choice."""
+    src = b if m is None else m
+    cats = set(src.get("categories", []))
+    return cats, "shopping" in cats and src.get("shoppingEdit", True)
+
+
+async def shared_bouquets(sharer_id: str, viewer_id: str) -> list[tuple[dict, set[str], bool]]:
+    """Every active bouquet both are in, with what the sharer shares there."""
+    if sharer_id == viewer_id:
+        return []
+    viewer_ids = {b["id"] for b, _ in await _my_bouquets(viewer_id)}
+    return [(b, *_shares_in(b, m)) for b, m in await _my_bouquets(sharer_id) if b["id"] in viewer_ids]
+
+
 async def _access(owner_id: str, viewer_id: str) -> tuple[set[str], bool, list[dict]]:
-    """(categories, shoppingEdit, bouquets in joined order) the viewer has on owner's planner."""
-    ids = [m["bouquetId"] async for m in
-           raw_db.bouquet_members.find({"ownerId": owner_id, "viewerId": viewer_id}).sort("joinedAt", 1)]
-    paused = await paused_ids(owner_id)
-    by_id = {b["id"]: b async for b in raw_db.bouquets.find({"id": {"$in": ids}}) if b["id"] not in paused}
-    bouquets = [by_id[i] for i in ids if i in by_id]
+    """(categories, shoppingEdit, common bouquets) — what owner_id shares with viewer_id across
+    every bouquet they're both in (owners share the bouquet's choice, members their own)."""
     cats: set[str] = set()
     edit = False
-    for b in bouquets:
-        cats |= set(b.get("categories", []))
-        edit = edit or ("shopping" in b.get("categories", []) and b.get("shoppingEdit", True))
-    return cats, edit, bouquets
+    common = await shared_bouquets(owner_id, viewer_id)
+    for _, c, e in common:
+        cats |= c
+        edit = edit or e
+    return cats, edit, [b for b, _, _ in common]
+
+
+async def co_members(uid: str) -> list[str]:
+    """Everyone you share an active bouquet with (owners and members alike)."""
+    ids: list[str] = []
+    for b, _ in await _my_bouquets(uid):
+        ids.append(b["ownerId"])
+        ids += [m["viewerId"] async for m in raw_db.bouquet_members.find({"bouquetId": b["id"]})]
+    return [i for i in dict.fromkeys(ids) if i != uid]
 
 
 async def _colors(viewer_id: str) -> dict[str, str]:
@@ -82,15 +122,25 @@ async def _state(uid: str) -> SharingState:
         members = [_person(u) async for u in raw_db.users.find({"user_id": {"$in": member_ids}}, {"_id": 0})]
         bouquets.append(Bouquet(id=b["id"], name=b["name"], code=b["code"], categories=b.get("categories", []),
                                 shoppingEdit=b.get("shoppingEdit", True), members=members, paused=b["id"] in paused))
-    owner_ids = list(dict.fromkeys([m["ownerId"] async for m in raw_db.bouquet_members.find({"viewerId": uid})]))
     joined: list[JoinedPlanner] = []
     colors = await _colors(uid)
-    async for u in raw_db.users.find({"user_id": {"$in": owner_ids}}, {"_id": 0}).sort("name", 1):
+    my_memberships = {m["bouquetId"]: m async for m in raw_db.bouquet_members.find({"viewerId": uid})}
+    async for u in raw_db.users.find({"user_id": {"$in": await co_members(uid)}}, {"_id": 0}).sort("name", 1):
         cats, edit, bqs = await _access(u["user_id"], uid)
         joined.append(JoinedPlanner(**_person(u).model_dump(), categories=sorted(cats), shoppingEdit=edit,
                                     bouquets=[b["name"] for b in bqs], bouquetIds=[b["id"] for b in bqs],
-                                    color=colors.get(u["user_id"])))
-    return SharingState(bouquets=bouquets, joined=joined)
+                                    color=colors.get(u["user_id"]),
+                                    canLeave=any(b["ownerId"] == u["user_id"] and b["id"] in my_memberships for b in bqs)))
+    memberships: list[Membership] = []
+    owners = {u["user_id"]: u async for u in raw_db.users.find(
+        {"user_id": {"$in": [m["ownerId"] for m in my_memberships.values()]}}, {"_id": 0, "user_id": 1, "name": 1})}
+    async for b in raw_db.bouquets.find({"id": {"$in": list(my_memberships)}}).sort("createdAt", 1):
+        m = my_memberships[b["id"]]
+        memberships.append(Membership(
+            bouquetId=b["id"], bouquetName=b["name"], ownerName=owners.get(b["ownerId"], {}).get("name", ""),
+            categories=m.get("categories", []), shoppingEdit=m.get("shoppingEdit", True),
+            paused=b["id"] in await paused_ids(b["ownerId"])))
+    return SharingState(bouquets=bouquets, joined=joined, memberships=memberships)
 
 
 async def _own_bouquet(bid: str, uid: str) -> dict:
@@ -226,11 +276,26 @@ async def join(input: JoinIn, request: Request):
     return out
 
 
+@router.put("/memberships/{bid}", response_model=SharingState)
+async def update_membership(bid: str, input: MembershipUpdate, request: Request):
+    """What YOU share with everyone in a bouquet you joined."""
+    uid = _uid(request)
+    updates = input.model_dump(exclude_unset=True, exclude_none=True)
+    if "categories" in updates:
+        updates["categories"] = list(dict.fromkeys(updates["categories"]))
+    if not updates:
+        raise HTTPException(status_code=422, detail="Nothing to update")
+    res = await raw_db.bouquet_members.update_one({"bouquetId": bid, "viewerId": uid}, {"$set": updates})
+    if not res.matched_count:
+        raise HTTPException(status_code=404, detail="You're not in that bouquet")
+    return await _state(uid)
+
+
 @router.put("/friends/{owner_id}/color", response_model=SharingState)
 async def set_friend_color(owner_id: str, input: FriendColorIn, request: Request):
     """Your calendar colour for a friend's planner (null = their bouquet's colour)."""
     uid = _uid(request)
-    if not await raw_db.bouquet_members.find_one({"ownerId": owner_id, "viewerId": uid}):
+    if owner_id not in await co_members(uid):
         raise HTTPException(status_code=404, detail="You don't have access to that planner")
     key = f"friendColors.{owner_id}"
     upd = {"$set": {key: input.color}} if input.color else {"$unset": {key: ""}}
@@ -255,12 +320,12 @@ def _mask(a: Appointment) -> Appointment:
 
 
 async def _owner_for(owner_id: str, viewer_id: str) -> tuple[dict, set[str], bool]:
-    if not await raw_db.bouquet_members.find_one({"ownerId": owner_id, "viewerId": viewer_id}):
+    cats, edit, common = await _access(owner_id, viewer_id)
+    if not common:
         raise HTTPException(status_code=404, detail="You don't have access to that planner")
     owner = await raw_db.users.find_one({"user_id": owner_id}, {"_id": 0})
     if not owner:
         raise HTTPException(status_code=404, detail="Planner not found")
-    cats, edit, _ = await _access(owner_id, viewer_id)
     return owner, cats, edit
 
 
@@ -299,7 +364,7 @@ async def friends_calendar(request: Request, from_: str = Query(alias="from"), t
     from routers import appointments
 
     uid = _uid(request)
-    owner_ids = list(dict.fromkeys([m["ownerId"] async for m in raw_db.bouquet_members.find({"viewerId": uid})]))
+    owner_ids = await co_members(uid)
     out: list[FriendCalendar] = []
     colors = await _colors(uid)
     async for owner in raw_db.users.find({"user_id": {"$in": owner_ids}}, {"_id": 0}).sort("name", 1):
@@ -364,9 +429,8 @@ async def _meals_owner(owner_id: str, request: Request) -> str:
 async def shared_meal_plans(request: Request):
     """Owners whose bouquets share a meal plan with you."""
     uid = _uid(request)
-    owner_ids = list(dict.fromkeys([m["ownerId"] async for m in raw_db.bouquet_members.find({"viewerId": uid})]))
     out = []
-    async for u in raw_db.users.find({"user_id": {"$in": owner_ids}}, {"_id": 0}).sort("name", 1):
+    async for u in raw_db.users.find({"user_id": {"$in": await co_members(uid)}}, {"_id": 0}).sort("name", 1):
         cats, _, _ = await _access(u["user_id"], uid)
         if "meals" in cats:
             out.append(_person(u))

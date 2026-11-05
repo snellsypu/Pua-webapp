@@ -1,0 +1,100 @@
+{
+  "iteration": 4,
+  "mode": "retest",
+  "passed": 12,
+  "failed": 0,
+  "summary": "Retest of iteration 3's 'Mutual bouquet sharing' feature set after the fix for the missing birthday age display. Backend suite (11 tests across 4 files, incl. the mutual-sharing file) re-ran clean. All 9 browser checks from iteration 3 were re-run by name (no script resent) and all passed, including the previously-failing 'bob-sees-alice-birthday-anniversaries' which now correctly shows 'turns 36' next to Alice's birthday card for Bob. Stale tests test_tscheck_access_management.py / test_tscheck_removed_user_access.py were confirmed deleted (not present in backend/tests).",
+  "bugs": [],
+  "action_items": [],
+  "retest_needed": false,
+  "checks": [
+    {
+      "criterion": "Bouquet owner's shared birthday appears for members with age",
+      "name": "bob-sees-alice-birthday-anniversaries",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Re-run (reran-persisted): As Bob on /anniversaries, Alice's birthday card now shows sub-label including 'Bouquet friend · turns 36' (previously only 'Bouquet friend' — fixed). Screenshot: bob-anniversaries-alice-birthday.png."
+    },
+    {
+      "criterion": "Members choose what they share with everyone in a bouquet they joined",
+      "name": "cara-chooser-shares-habits",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Re-run (reran-persisted): PASSED, 3 screenshots (before-tick, after-tick, persisted-after-reload)."
+    },
+    {
+      "criterion": "What a member shares is visible to every other bouquet member, including the owner",
+      "name": "alice-sees-bob-shared-categories",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Re-run (reran-persisted): PASSED, 3 screenshots confirming Alice and Cara both see Bob's shared appointment."
+    },
+    {
+      "criterion": "What a member shares is visible to every other bouquet member (API: calendar overlay + shared planner)",
+      "name": "test_tscheck_mutual_bouquet_sharing.py",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "Full backend suite re-run: 11 passed in 1.14s (includes test_friends_calendar_overlay_includes_bob_appointment, test_shared_planner_shows_bob_appointment_for_alice_and_cara, test_friend_gift_list_is_private_per_viewer)."
+    },
+    {
+      "criterion": "After Cara ticks a category, Bob (another member) sees it",
+      "name": "bob-sees-cara-habits-after-share",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Re-run (reran-persisted): PASSED, 2 screenshots (bob sharing page + shared-t_c habits section)."
+    },
+    {
+      "criterion": "Gift list works for bouquet friends' birthdays",
+      "name": "bob-manages-alice-gift-list",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Re-run (reran-persisted): PASSED, 5 screenshots incl. add/persist/cleanup of Scarf; seed Candle+Book restored."
+    },
+    {
+      "criterion": "Gift list works for bouquet friends' birthdays (API: private per viewer)",
+      "name": "test_tscheck_mutual_bouquet_sharing.py::test_friend_gift_list_is_private_per_viewer",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "Covered in same backend suite re-run (11 passed)."
+    },
+    {
+      "criterion": "Friend gift ideas appear in the heads-up",
+      "name": "bob-today-headsup-shows-alice-gift",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Re-run (reran-persisted): PASSED, screenshot home-headsup-alice-gift.png."
+    },
+    {
+      "criterion": "Own birthday settings save reliably",
+      "name": "cara-settings-birthday-save-persists",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Re-run (reran-persisted): PASSED, 3 screenshots (before/after-save/persisted-after-reload)."
+    },
+    {
+      "criterion": "Owner-only leave button",
+      "name": "leave-button-owner-only",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Re-run (reran-persisted): PASSED, screenshot bob-sharing-leave-buttons.png."
+    },
+    {
+      "criterion": "Owner-only leave button (public preview ingress)",
+      "name": "leave-button-owner-only-preview",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Re-run against https://daily-loop-8--68ipsq2d.preview.emergentagent.com (reran-persisted): PASSED, screenshot preview-leave-buttons.png."
+    },
+    {
+      "criterion": "Regression: stale access-management tests removed",
+      "name": "backend tests/ directory listing",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "ls /app/backend/tests/ shows only conftest.py, test_tscheck_anniversary_year.py, test_tscheck_cron_webhook.py, test_tscheck_mutual_bouquet_sharing.py, test_tscheck_signed_out_401.py — the two stale files (test_tscheck_access_management.py, test_tscheck_removed_user_access.py) are confirmed deleted. Full suite: 11 passed, 0 failed, 0 errors."
+    }
+  ],
+  "notes": [
+    "Previously-filed medium bug ('Bouquet owner's shared birthday appears for members' missing 'turns N') is now fixed and verified; all other iteration-3 criteria regression-tested clean with zero script changes (named re-runs only, no script resent).",
+    "No new criteria were introduced in this briefing beyond the two listed (the fix-verification criterion + 'rerun existing checks' regression criterion), so no new artifacts were authored this iteration."
+  ]
+}

@@ -10,7 +10,7 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field, field_validator
 
 from lib.dates import today_iso
-from lib.db import db, raw_db
+from lib.db import current_owner, db, raw_db
 from lib.holidays import DEFAULT_SETS, HOLIDAY_SETS, holidays_between
 
 router = APIRouter(prefix="/anniversaries", tags=["anniversaries"])
@@ -60,6 +60,7 @@ class UpcomingEvent(BaseModel):
     custom: Anniversary | None = None  # editable fields (custom events only)
     friend: str | None = None  # user_id when it's a bouquet friend's shared birthday
     milestone: str | None = None  # e.g. "18th", "Big 40", "Silver" — decades + English milestones
+    gifts: list[GiftIdea] = Field(default_factory=list)  # your private gift ideas for a friend's birthday
 
 
 class HolidaySetState(BaseModel):
@@ -133,15 +134,11 @@ async def _sets() -> list[str]:
 
 
 async def _friend_birthdays(uid: str) -> list[dict]:
-    """Shared birthdays of everyone you share a bouquet with (either direction)."""
-    mine = [b["id"] async for b in raw_db.bouquets.find({"ownerId": uid}, {"id": 1})]
-    ids = {m["viewerId"] async for m in raw_db.bouquet_members.find({"bouquetId": {"$in": mine}})}
-    joined = [m async for m in raw_db.bouquet_members.find({"viewerId": uid})]
-    ids |= {m["ownerId"] for m in joined}
-    ids |= {m["viewerId"] async for m in raw_db.bouquet_members.find({"bouquetId": {"$in": [j["bouquetId"] for j in joined]}})}
-    ids.discard(uid)
+    """Shared birthdays of everyone you share an active bouquet with (owners and members)."""
+    from routers.sharing import co_members
+
     return [u async for u in raw_db.users.find(
-        {"user_id": {"$in": list(ids)}, "birthday.share": True, "birthday.date": {"$ne": None}}, {"_id": 0})]
+        {"user_id": {"$in": await co_members(uid)}, "birthday.share": True, "birthday.date": {"$ne": None}}, {"_id": 0})]
 
 
 async def upcoming(days: int = 366) -> list[UpcomingEvent]:
@@ -149,6 +146,7 @@ async def upcoming(days: int = 366) -> list[UpcomingEvent]:
 
     today = date.fromisoformat(today_iso())
     out: list[UpcomingEvent] = []
+    friend_gifts = {g["friendId"]: g.get("gifts", []) async for g in db.friend_gifts.find({}, {"_id": 0})}
     for u in await _friend_birthdays(current_owner.get()):
         nxt = _next(u["birthday"]["date"], today)
         by = u["birthday"].get("year")
@@ -156,7 +154,7 @@ async def upcoming(days: int = 366) -> list[UpcomingEvent]:
         out.append(UpcomingEvent(
             id=f"friend:{u['user_id']}", title=u.get("name", "Friend").split(" ")[0], emoji="🎈", kind="birthday",
             next=nxt.isoformat(), daysUntil=(nxt - today).days, years=yrs, milestone=milestone("birthday", yrs),
-            friend=u["user_id"]))
+            friend=u["user_id"], gifts=[GiftIdea(**g) for g in friend_gifts.get(u["user_id"], [])]))
     async for a in db.anniversaries.find({}, {"_id": 0}):
         ann = Anniversary(**a)
         nxt = _next(ann.date, today)
@@ -176,7 +174,7 @@ def heads_up_line(events: list[UpcomingEvent]) -> str:
     """Briefing sentence for events today, tomorrow and in a week ("" if none)."""
     name = spoken_name
     def gifts(e: UpcomingEvent) -> str:
-        todo = [g.text for g in (e.custom.gifts if e.custom else []) if not g.bought]
+        todo = [g.text for g in (e.custom.gifts if e.custom else e.gifts) if not g.bought]
         return f" — gift ideas: {', '.join(todo[:4])}" if todo else ""
     groups = {d: [name(e) + (gifts(e) if d in (7, 1) else "") for e in events if e.daysUntil == d] for d in HEADS_UP}
     month = [name(e) for e in events if is_heads_up(e) and e.daysUntil == MILESTONE_LEAD]
@@ -217,6 +215,20 @@ async def get_my_birthday(request: Request):
 async def put_my_birthday(input: MyBirthday, request: Request):
     await raw_db.users.update_one({"user_id": request.state.user["user_id"]}, {"$set": {"birthday": input.model_dump()}})
     return input
+
+
+class FriendGiftsIn(BaseModel):
+    gifts: list[GiftIdea] = Field(default_factory=list, max_length=20)
+
+
+@router.put("/friends/{friend_id}/gifts", response_model=list[GiftIdea])
+async def put_friend_gifts(friend_id: str, input: FriendGiftsIn):
+    """Your own (private) gift list for a bouquet friend's shared birthday."""
+    if friend_id not in {u["user_id"] for u in await _friend_birthdays(current_owner.get())}:
+        raise HTTPException(status_code=404, detail="That friend's birthday isn't shared with you")
+    gifts = [g.model_dump() for g in input.gifts]
+    await db.friend_gifts.update_one({"friendId": friend_id}, {"$set": {"gifts": gifts}}, upsert=True)
+    return input.gifts
 
 
 @router.get("/holiday-sets", response_model=list[HolidaySetState])

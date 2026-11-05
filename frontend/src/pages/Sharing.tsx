@@ -12,7 +12,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { toast } from "sonner";
 import { Copy, Eye, Link2, LogOut, Pause, Pencil, Plus, QrCode, RefreshCw, Sparkles, Trash2, UserMinus, UserPlus } from "lucide-react";
 import { apiDelete, apiGet, apiPost, apiPut, ApiError } from "@/lib/api";
-import type { Bouquet, BouquetUpdate, ShareCategory, SharingState } from "@/lib/types";
+import type { Bouquet, BouquetUpdate, Membership, MembershipUpdate, ShareCategory, SharingState } from "@/lib/types";
 import { Avatar } from "@/components/AccountButton";
 import { Flower, flowerFor } from "@/components/Flower";
 import { Button } from "@/components/ui/button";
@@ -47,6 +47,60 @@ function useSharingMutations() {
   return { wrap };
 }
 
+/** "What X sees" checklist — used for your own bouquets and for what you share in ones you joined. */
+function ShareChooser({ tid, categories, shoppingEdit, pending, onChange }: {
+  tid: string; categories: ShareCategory[]; shoppingEdit: boolean; pending: boolean; onChange: (u: { categories?: ShareCategory[]; shoppingEdit?: boolean }) => void;
+}) {
+  const selected = new Set(categories);
+  const everything = ALL.every((c) => selected.has(c));
+  const toggle = (c: ShareCategory, on: boolean) => onChange({ categories: ALL.filter((x) => (x === c ? on : selected.has(x))) });
+  return (
+    <>
+      <label htmlFor={`${tid}-everything`} className="flex items-center gap-2.5 rounded-xl border bg-muted/30 px-3 py-2 text-sm font-medium">
+        <Checkbox id={`${tid}-everything`} checked={everything} disabled={pending}
+          onCheckedChange={(c) => onChange({ categories: c === true ? ALL : [] })} data-testid={`${tid}-share-everything`} />
+        Everything
+      </label>
+      <div className="grid grid-cols-2 gap-2">
+        {ALL.map((c) => (
+          <label key={c} htmlFor={`${tid}-share-${c}`} className="flex items-center gap-2.5 rounded-xl border px-3 py-2 text-sm">
+            <Checkbox id={`${tid}-share-${c}`} checked={selected.has(c)} disabled={pending}
+              onCheckedChange={(v) => toggle(c, v === true)} data-testid={`${tid}-share-${c}`} />
+            {SHARE_LABELS[c]}
+          </label>
+        ))}
+      </div>
+      {selected.has("shopping") && (
+        <label htmlFor={`${tid}-shopping-edit`} className="flex items-start gap-2.5 rounded-xl border border-dashed px-3 py-2 text-sm">
+          <Checkbox id={`${tid}-shopping-edit`} className="mt-0.5" checked={shoppingEdit} disabled={pending}
+            onCheckedChange={(v) => onChange({ shoppingEdit: v === true })} data-testid={`${tid}-shopping-edit`} />
+          <span><span className="block font-medium">Can tick off &amp; add shopping items</span>
+            <span className="block text-xs text-muted-foreground">Everything else stays view-only.</span></span>
+        </label>
+      )}
+    </>
+  );
+}
+
+function MembershipCard({ m }: { m: Membership }) {
+  const { wrap } = useSharingMutations();
+  const update = useMutation(wrap((u: MembershipUpdate) => apiPut<SharingState>(`/sharing/memberships/${m.bouquetId}`, u), () => `${m.bouquetName} updated`));
+  const tid = `membership-${m.bouquetId}`;
+  return (
+    <li className="space-y-2 rounded-2xl border p-3" data-testid={tid}>
+      <div className="flex items-center gap-2">
+        <Flower kind={flowerFor(m.bouquetId)} className="size-6 shrink-0" />
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-sm font-medium">{m.bouquetName}</span>
+          <span className="block truncate text-xs text-muted-foreground">{m.ownerName}&apos;s bouquet · {m.categories.length ? `you share ${m.categories.length}` : "you share nothing yet"}</span>
+        </span>
+        {m.paused && <span className="rounded-full bg-amber-400/25 px-2 text-[11px] font-semibold text-amber-900 dark:text-amber-200">Paused</span>}
+      </div>
+      <ShareChooser tid={tid} categories={m.categories} shoppingEdit={m.shoppingEdit} pending={update.isPending} onChange={(u) => update.mutate(u)} />
+    </li>
+  );
+}
+
 function BouquetCard({ b }: { b: Bouquet }) {
   const { wrap } = useSharingMutations();
   const [editing, setEditing] = useState(false);
@@ -57,9 +111,6 @@ function BouquetCard({ b }: { b: Bouquet }) {
   const remove = useMutation(wrap((id: string) => apiDelete<SharingState>(`/sharing/bouquets/${b.id}/members/${id}`), () => "Removed from this bouquet"));
   const [confirmDel, setConfirmDel] = useState(false);
 
-  const selected = new Set(b.categories);
-  const everything = ALL.every((c) => selected.has(c));
-  const toggle = (c: ShareCategory, on: boolean) => update.mutate({ categories: ALL.filter((x) => (x === c ? on : selected.has(x))) });
   const copy = async () => {
     try { await navigator.clipboard.writeText(b.code); toast.success(`${b.name} code copied`); }
     catch { toast.error("Couldn't copy — select the code and copy it"); }
@@ -119,28 +170,7 @@ function BouquetCard({ b }: { b: Bouquet }) {
         <CardContent className="grid gap-5 md:grid-cols-5">
           <div className="space-y-2 md:col-span-3">
             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">What this bouquet sees</p>
-            <label htmlFor={`${tid}-everything`} className="flex items-center gap-2.5 rounded-xl border bg-muted/30 px-3 py-2 text-sm font-medium">
-              <Checkbox id={`${tid}-everything`} checked={everything} disabled={update.isPending}
-                onCheckedChange={(c) => update.mutate({ categories: c === true ? ALL : [] })} data-testid={`${tid}-share-everything`} />
-              Everything
-            </label>
-            <div className="grid grid-cols-2 gap-2">
-              {ALL.map((c) => (
-                <label key={c} htmlFor={`${tid}-share-${c}`} className="flex items-center gap-2.5 rounded-xl border px-3 py-2 text-sm">
-                  <Checkbox id={`${tid}-share-${c}`} checked={selected.has(c)} disabled={update.isPending}
-                    onCheckedChange={(v) => toggle(c, v === true)} data-testid={`${tid}-share-${c}`} />
-                  {SHARE_LABELS[c]}
-                </label>
-              ))}
-            </div>
-            {selected.has("shopping") && (
-              <label htmlFor={`${tid}-shopping-edit`} className="flex items-start gap-2.5 rounded-xl border border-dashed px-3 py-2 text-sm">
-                <Checkbox id={`${tid}-shopping-edit`} className="mt-0.5" checked={b.shoppingEdit} disabled={update.isPending}
-                  onCheckedChange={(v) => update.mutate({ shoppingEdit: v === true })} data-testid={`${tid}-shopping-edit`} />
-                <span><span className="block font-medium">Can tick off &amp; add shopping items</span>
-                  <span className="block text-xs text-muted-foreground">Everything else stays view-only.</span></span>
-              </label>
-            )}
+            <ShareChooser tid={tid} categories={b.categories} shoppingEdit={b.shoppingEdit} pending={update.isPending} onChange={(u) => update.mutate(u)} />
           </div>
           <div className="space-y-2 md:col-span-2">
             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">People</p>
@@ -207,7 +237,7 @@ export default function Sharing() {
   });
   const atLimit = !!s && !premium.data?.active && s.bouquets.length >= (premium.data?.freeBouquets ?? 2);
   const join = useMutation({
-    ...wrap((c: string) => apiPost<SharingState>("/sharing/join", { code: c }), () => "Joined! Their planner is below"),
+    ...wrap((c: string) => apiPost<SharingState>("/sharing/join", { code: c }), () => "Joined! Now choose what you share with them below"),
     onSettled: () => setCode(""),
   });
   const leave = useMutation(wrap((id: string) => apiDelete<SharingState>(`/sharing/joined/${id}`), () => "Left that planner"));
@@ -249,7 +279,7 @@ export default function Sharing() {
 
       <Card data-testid="joined-card">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 font-heading"><UserPlus className="size-4" /> Planners shared with you</CardTitle>
+          <CardTitle className="flex items-center gap-2 font-heading"><UserPlus className="size-4" /> People in your bouquets</CardTitle>
           <CardDescription>Open an invite link or enter a bouquet code to join it. Joining another bouquet keeps you in the ones you&apos;re already in.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -281,14 +311,30 @@ export default function Sharing() {
                   )}
                   <Link to={`/shared/${p.user_id}`} className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-primary px-3 text-sm font-medium text-primary-foreground transition-opacity duration-150 hover:opacity-90"
                     data-testid={`joined-open-${p.user_id}`}><Eye className="size-4" /> View</Link>
-                  <Button variant="ghost" size="icon-sm" aria-label="Leave" title="Leave all their bouquets" onClick={() => leave.mutate(p.user_id)} disabled={leave.isPending}
-                    data-testid={`joined-leave-${p.user_id}`}><LogOut className="size-4" /></Button>
+                  {p.canLeave && (
+                    <Button variant="ghost" size="icon-sm" aria-label="Leave" title="Leave all their bouquets" onClick={() => leave.mutate(p.user_id)} disabled={leave.isPending}
+                      data-testid={`joined-leave-${p.user_id}`}><LogOut className="size-4" /></Button>
+                  )}
                 </li>
               ))}
             </ul>
-          ) : <p className="text-sm text-muted-foreground" data-testid="joined-empty">You haven&apos;t joined any bouquets yet.</p>}
+          ) : <p className="text-sm text-muted-foreground" data-testid="joined-empty">No one in your bouquets yet.</p>}
         </CardContent>
       </Card>
+
+      {!!s?.memberships.length && (
+        <Card data-testid="memberships-card">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 font-heading"><Flower kind="plumeria" className="size-5" /> What you share in bouquets you joined</CardTitle>
+            <CardDescription>Everyone in that bouquet sees what you tick here. Private appointments still show as &ldquo;Unavailable&rdquo;.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ul className="grid gap-3 md:grid-cols-2" data-testid="memberships-list">
+              {s.memberships.map((m) => <MembershipCard key={m.bouquetId} m={m} />)}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
