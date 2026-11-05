@@ -37,6 +37,7 @@ function EventDialog({ open, onOpenChange, initial }: { open: boolean; onOpenCha
   const qc = useQueryClient();
   const [f, setF] = useState<AnniversaryIn>(() => initial ?? { title: "", kind: "birthday", date: "01-01", year: null, emoji: "", gifts: [] });
   const [gift, setGift] = useState("");
+  const [yearText, setYearText] = useState(() => (initial?.year ? String(initial.year) : ""));
   const addGift = () => { if (gift.trim()) { setF({ ...f, gifts: [...f.gifts, { text: gift.trim(), bought: false }] }); setGift(""); } };
   const [month, day] = f.date.split("-").map(Number);
   const save = useMutation({
@@ -86,8 +87,8 @@ function EventDialog({ open, onOpenChange, initial }: { open: boolean; onOpenCha
             </div>
             <div className="grid gap-1.5">
               <Label htmlFor="ann-year">Year <span className="text-muted-foreground">(optional)</span></Label>
-              <Input id="ann-year" inputMode="numeric" maxLength={4} value={f.year ?? ""} placeholder="1990"
-                onChange={(e) => { const y = e.target.value.replace(/\D/g, ""); setF({ ...f, year: y.length === 4 ? Number(y) : null }); }} data-testid="anniversary-year-input" />
+              <Input id="ann-year" inputMode="numeric" maxLength={4} value={yearText} placeholder="1990"
+                onChange={(e) => { const y = e.target.value.replace(/\D/g, "").slice(0, 4); setYearText(y); setF({ ...f, year: y.length === 4 ? Number(y) : null }); }} data-testid="anniversary-year-input" />
             </div>
           </div>
           {f.kind === "birthday" && (

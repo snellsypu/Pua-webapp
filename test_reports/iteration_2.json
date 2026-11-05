@@ -1,0 +1,79 @@
+{
+  "iteration": 2,
+  "mode": "generate",
+  "passed": 8,
+  "failed": 0,
+  "summary": "All 5 acceptance criteria for the Anniversaries year-field bug fix verified: 3 backend tests (API) + 5 browser checks (UI), all passed. Year field no longer resets while typing; save/edit/clear of year works end-to-end.",
+  "bugs": [],
+  "action_items": [
+    {
+      "type": "pre_existing_test_error",
+      "severity": "low",
+      "detail": "Unrelated to this task: tests/test_tscheck_access_management.py and tests/test_tscheck_removed_user_access.py (written in a prior iteration against an older 'owner/access-list' auth model) now fail/error because that access-list concept no longer exists in the current app (routers/ has no access.py; auth model per /app/memory/test_credentials.md is now open Google sign-in, any account gets a private planner). These are stale artifacts from a previous app version, not introduced by this task, and not part of the current acceptance_matrix — flagging for main agent to decide whether to delete/update them."
+    }
+  ],
+  "retest_needed": false,
+  "checks": [
+    {
+      "criterion": "User can type a full 4-digit year into the Year field of the Anniversaries add dialog (bug: field previously reset after each digit)",
+      "name": "anniversary-year-types-progressively",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Ran on required public preview URL (https://daily-loop-8--68ipsq2d.preview.emergentagent.com, mobile viewport 390x844) with injected session cookie. Typed '1','9','9','0' into data-testid=anniversary-year-input one key at a time; input value progressed '1' -> '19' -> '199' -> '1990' without resetting."
+    },
+    {
+      "criterion": "Saving a birthday with a year stores it",
+      "name": "anniversary-birthday-save-shows-turns-badge",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Created birthday 'Test Mum TSCheck' with year 1990 via UI; after save, list card showed 'Turns N' badge (regex /Turns \\d+/). Backend test confirms GET /api/anniversaries custom entry has year 1990."
+    },
+    {
+      "criterion": "Saving a birthday with a year stores it (API)",
+      "name": "test_tscheck_anniversary_year.py::test_birthday_with_year_shows_turns_badge",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "POST /api/anniversaries {title:'Test Mum', kind:'birthday', date:'06-15', year:1990} -> 201, body.year==1990; GET /api/anniversaries -> matching custom entry has year:1990 and computed years>=35."
+    },
+    {
+      "criterion": "Saving an anniversary with a year works",
+      "name": "anniversary-anniversary-save-shows-years",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Created anniversary 'TSCheck Wedding Anniv' with year 2015 via UI; list card showed 'N years' badge (regex /\\d+ years/)."
+    },
+    {
+      "criterion": "Saving an anniversary with a year works (API)",
+      "name": "test_tscheck_anniversary_year.py::test_anniversary_with_year_shows_years",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "POST /api/anniversaries {title:'Our Wedding', kind:'anniversary', date:'03-20', year:2015} -> 201, body.year==2015; GET /api/anniversaries -> matching custom entry has years>=9."
+    },
+    {
+      "criterion": "Editing an existing entry shows its saved year and allows changing it",
+      "name": "anniversary-edit-year-persists",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Created 'TSCheck Edit Year Person' with year 1988; reopened edit dialog -> year input showed '1988'; cleared it and saved -> card lost 'Turns N' badge; reopened (input empty), typed '1992', saved -> badge reappeared. Fixture deleted via its own Delete button at end of check."
+    },
+    {
+      "criterion": "Editing an existing entry shows its saved year and allows changing it (API)",
+      "name": "test_tscheck_anniversary_year.py::test_editing_entry_changes_and_clears_year",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "POST create with year:2000 -> 201; PUT same id with year:2001 -> 200, year==2001; PUT with year:null -> 200, year==null."
+    },
+    {
+      "criterion": "Non-digits are ignored and max 4 digits",
+      "name": "anniversary-year-non-digit-filtered",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Typed 'ab12345' into anniversary-year-input; resulting value was '1234' (letters stripped, truncated to 4 digits)."
+    }
+  ],
+  "notes": [
+    "5 acceptance-matrix criteria covered by 5 browser checks + 1 new backend test file (test_tscheck_anniversary_year.py, 3 tests) = 8 checks[] entries; 2 criteria had both UI and API surfaces so got both artifact kinds.",
+    "Test user: created per /app/auth_testing.md (users+user_sessions docs, onboarded:true) and deleted afterward (verified 0 remaining tscheck users). All tscheck- anniversaries created via UI during browser checks were deleted via DELETE /api/anniversaries/{id} after the run (verified 200 responses) and via a final mongosh cleanup of anniversaries with title matching 'TSCheck' as a safety net — no seeded/real data was touched.",
+    "Confirmed the reported bug is fixed: EventDialog keeps a separate `yearText` string state (not derived from the committed `year` number) so intermediate digits are not clobbered by re-render."
+  ]
+}
